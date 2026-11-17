@@ -24,4 +24,13 @@ Preparado para la nube: toda la persistencia pasa por `Store.load()/save()` (asy
 Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor, importar IA) · Compras (rango de fechas, agregada y escalada por porciones) · Cocinar (pasos, temporizadores múltiples con alarma/vibración/notificación) · Datos (respaldo JSON, prompt para IA).
 
 ## Formato IA
-`{"schema":"planner/1","recipes":[...],"plan":[{"date","recipe","time","servings"}]}`; el importador acepta también una receta suelta o un arreglo, alias en español, y limpia bloques ```json.
+`{"schema":"planner/2","recipes":[...],"plan":[{"date","recipe","meal","time","servings"}]}`; el importador acepta también una receta suelta o un arreglo, alias en español, y limpia bloques ```json.
+
+## Versión 2 (interfaz detallada + recetario)
+- Navegación: Hoy · Mes · Recetario · Compras · Más (barra lateral en PC, pestañas abajo en móvil).
+- Día organizado por franjas de comida (desayuno, almuerzo, merienda, cena); cada franja tiene "+ Añadir", que abre el selector del recetario (añadir con un toque, varias a la vez) o crea una receta nueva que se añade al día al guardarla.
+- Recetario: tarjetas con "plato" (emoji sobre círculo del color de la comida), filtros por categoría/favoritas, orden, detalle con porciones escalables y "En tu plan".
+- Recetas con categoría, dificultad, emoji y favorita. Plan con `meal`. 12 recetas de ejemplo en el primer arranque.
+- Compras agrupadas por pasillo, con progreso y compartir.
+- Cocinar: lista de ingredientes marcable, lista de pasos navegable, temporizador sugerido si el texto menciona minutos; al terminar marca el platillo como hecho.
+- Paleta "huerto" (albahaca, azafrán, tomate) y tipografías Bricolage Grotesque + Atkinson Hyperlegible.

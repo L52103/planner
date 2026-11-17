@@ -4,23 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Planner de Recetas</title>
-<meta name="theme-color" content="#d9622b">
+<meta name="description" content="Planifica las comidas del mes, tu recetario, la lista de compras y cocina paso a paso.">
+<meta name="theme-color" content="#1F5C43">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="timers" aria-live="polite"></div>
-<main id="view"></main>
-<nav id="nav">
-  <button data-act="nav" data-view="calendar"><i>📅</i><span>Mes</span></button>
-  <button data-act="nav" data-view="recipes"><i>📖</i><span>Recetas</span></button>
-  <button data-act="nav" data-view="shop"><i>🛒</i><span>Compras</span></button>
-  <button data-act="nav" data-view="data"><i>⚙️</i><span>Datos</span></button>
-</nav>
+<div class="app">
+  <nav id="nav" aria-label="Secciones">
+    <div class="brand"><img src="icons/icon.svg" alt="" width="34" height="34"><span>Planner<small>de recetas</small></span></div>
+    <button data-act="nav" data-view="today"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Hoy</span></button>
+    <button data-act="nav" data-view="month"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Mes</span></button>
+    <button data-act="nav" data-view="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M5 18a3 3 0 0 1 3-3h10M9 8h5"/></svg><span>Recetario</span></button>
+    <button data-act="nav" data-view="shop"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12h12l2-8H6.2"/></svg><span>Compras</span></button>
+    <button data-act="nav" data-view="more"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Más</span></button>
+  </nav>
+  <div class="content">
+    <div id="timers" aria-live="polite"></div>
+    <main id="view"></main>
+  </div>
+</div>
 <dialog id="dlg"></dialog>
-<div id="toast" role="status"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
 </html>
