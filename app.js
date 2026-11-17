@@ -130,7 +130,7 @@ const Store = {
 };
 
 /* ───────── estado ───────── */
-const emptyState = () => ({ version: 2, updatedAt: 0, recipes: [], plan: {}, lists: [] });
+const emptyState = () => ({ version: 2, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null });
 let S = emptyState();
 
 function normalizeState(d) {
@@ -169,6 +169,7 @@ function normalizeState(d) {
   } else if (d.shop && Array.isArray(d.shop.extra) && d.shop.extra.length) {
     s.lists = [{ id: uid(), name: 'Mi lista', createdAt: Date.now(), from: '', to: '', removed: [], items: d.shop.extra.filter(e => e && e.name).map(e => normItem({ name: e.name, checked: e.checked })) }];
   }
+  if (d.profile && typeof d.profile === 'object') s.profile = { ...d.profile };
   return s;
 }
 function save() { S.updatedAt = Date.now(); return Store.save(S); }
@@ -1128,27 +1129,97 @@ function buildPlan(o) {
 }
 function orgDlg() {
   const [f, t] = monthRange('rest');
-  ui.org = { mode: 'auto', preset: 'rest', from: f, to: t, meals: ['almuerzo', 'cena'], source: 'all', skipFilled: true, gap: 4, preview: [] };
+  ui.org = { mode: 'auto', preset: 'rest', from: f, to: t, meals: ['almuerzo', 'cena'], source: 'all', skipFilled: true, gap: 4, preview: [], nutri: true, allowNew: true, extra: '', showPrompt: false };
   orgRefresh();
 }
 function orgRefresh() { ui.org.preview = buildPlan(ui.org); renderOrg(); }
-const planPrompt = o => `Organiza mi menú usando SOLO recetas de esta lista (son las de mi recetario):
-${S.recipes.map(r => `- ${r.name} (${CATS[r.category].name.toLowerCase()})`).join('\n')}
+/* perfil nutricional para el prompt de la IA */
+const PROFILE_DEFAULT = { sex: 'mujer', age: 22, activity: 'moderada', weight: '', goal: 'energia', restrictions: '', servings: 1 };
+const ACTIVITY = { sedentaria: 'Sedentaria (poco movimiento)', moderada: 'Moderada (camino o hago ejercicio algunos días)', activa: 'Activa (ejercicio casi todos los días)' };
+const GOALS = { energia: 'Tener energía y rendir bien en el día a día', mantener: 'Mantener mi peso comiendo equilibrado', bajar: 'Bajar de peso de forma saludable', musculo: 'Ganar masa muscular' };
+const ACT_SHORT = { sedentaria: 'Sedentaria', moderada: 'Moderada (ejercicio algunos días)', activa: 'Activa (casi a diario)' };
+const GOAL_SHORT = { energia: 'Energía y rendimiento', mantener: 'Mantener mi peso', bajar: 'Bajar de peso', musculo: 'Ganar músculo' };
+const profile = () => ({ ...PROFILE_DEFAULT, ...(S.profile || {}) });
 
-Responde ÚNICAMENTE con un JSON válido, sin texto adicional, con este formato:
-{
-  "plan": [
-    { "date": "${o.from}", "recipe": "Nombre exacto de la lista", "meal": "almuerzo", "time": "13:30", "servings": 2 }
-  ]
+// Valores diarios de referencia (ingestas recomendadas para adultos jóvenes, orientativos)
+function nutriTargets(p) {
+  const w = p.sex === 'mujer';
+  const kcal = { mujer: { sedentaria: '1800–2000', moderada: '2000–2200', activa: '2200–2400' }, hombre: { sedentaria: '2200–2400', moderada: '2400–2800', activa: '2800–3000' } }[w ? 'mujer' : 'hombre'][p.activity];
+  const kg = num(p.weight, 0);
+  const protPerKg = p.goal === 'musculo' ? '1,4–1,8' : p.activity === 'activa' ? '1,2–1,6' : '1,0–1,2';
+  const prot = kg ? `${protPerKg} g por kg (unos ${Math.round(kg * parseFloat(protPerKg.replace(',', '.')))}–${Math.round(kg * parseFloat(protPerKg.split('–')[1].replace(',', '.')))} g)` : `al menos ${w ? 46 : 56} g (mejor ${protPerKg} g por kg de peso)`;
+  const goalLine = { energia: 'mantener la energía estable: comidas regulares, carbohidratos complejos en cada comida y meriendas con proteína', mantener: 'equilibrio entre lo que como y lo que gasto', bajar: 'un déficit suave (unas 300–500 kcal menos), sin bajar de 1600 kcal ni saltar comidas, y mucha saciedad (proteína y fibra)', musculo: 'un pequeño superávit (unas 200–300 kcal más) y proteína repartida en 4 tomas' }[p.goal];
+  return [
+    `Energía: ${kcal} kcal al día${p.goal === 'bajar' ? ' como referencia de mantenimiento' : ''}, repartidas en desayuno, almuerzo, merienda y cena. Objetivo: ${goalLine}.`,
+    `Proteína: ${prot}, repartida en todas las comidas (huevo, lácteos, legumbres, pollo, pescado, tofu).`,
+    `Carbohidratos de calidad y fibra: ${w ? '25–28' : '30–34'} g de fibra (cereales integrales, avena, legumbres, verduras, fruta).`,
+    `Hierro: ${w ? '18' : '8'} mg (legumbres, carne roja magra, espinaca, frutos secos), acompañado de vitamina C (cítricos, pimiento, tomate) para absorberlo mejor.`,
+    'Calcio: 1000 mg (lácteos, bebidas vegetales fortificadas, sardinas, tofu, almendras) y vitamina D: 15 µg (600 UI) (pescado azul, huevo, lácteos fortificados).',
+    `Ácido fólico: 400 µg (hojas verdes, legumbres, cítricos, aguacate)${w ? ', especialmente importante para mujeres en edad fértil' : ''}.`,
+    `Vitamina B12: 2,4 µg; magnesio: ${w ? '310' : '400'} mg; zinc: ${w ? '8' : '11'} mg; omega-3: pescado azul unas 2 veces por semana, nueces, chía o linaza.`,
+    'Variedad: al menos 5 porciones de frutas y verduras de colores distintos al día; grasas saludables (aceite de oliva, aguacate, frutos secos).',
+    'Hidratación: recuerda unos 2,7 L de líquidos al día (no hace falta incluirlo en el JSON).',
+    'Limita ultraprocesados, frituras y azúcares añadidos; porciones realistas y recetas sencillas de cocinar entre semana.',
+  ];
 }
 
-Reglas:
-- "recipe" debe ser exactamente uno de los nombres de la lista.
-- "meal": desayuno, almuerzo, merienda o cena. "time" en HH:MM (24 h). "servings" es opcional.
-- Fechas en formato AAAA-MM-DD, entre ${o.from} y ${o.to}.
-- Evita repetir la misma receta en días seguidos.
+const RECIPE_FORMAT = `    {
+      "name": "Nombre de la receta",
+      "emoji": "🥗",
+      "category": "almuerzo",
+      "difficulty": "facil",
+      "description": "Descripción breve",
+      "servings": 1,
+      "prepMinutes": 10,
+      "cookMinutes": 20,
+      "tags": ["alto en hierro", "rico en fibra"],
+      "ingredients": [{ "name": "Lentejas", "quantity": 80, "unit": "g" }],
+      "steps": [{ "text": "Cocina las lentejas.", "timerMinutes": 25 }],
+      "notes": "Aporte aproximado por porción: 450 kcal, 25 g proteína, 6 mg hierro"
+    }`;
 
-Lo que quiero: [DESCRIBE AQUÍ: qué comidas planificar, qué días, para cuántas personas, preferencias…]`;
+function planPrompt(o) {
+  const p = profile();
+  const recipes = S.recipes.map(r => `- ${r.name} (${CATS[r.category].name.toLowerCase()}${r.tags.length ? ', ' + r.tags.slice(0, 3).join(', ') : ''})`).join('\n');
+  const who = `${p.sex === 'mujer' ? 'Mujer' : 'Hombre'} de ${p.age} años${num(p.weight, 0) ? `, ${num(p.weight, 0)} kg` : ''}. Actividad: ${ACTIVITY[p.activity].toLowerCase()}.`;
+  const nutri = o.nutri;
+  const out = [];
+  out.push(nutri
+    ? `Actúa como nutricionista y planificador de menús. Organiza mi menú del ${o.from} al ${o.to} priorizando que cubra mis necesidades nutricionales para tener energía y rendir bien cada día.`
+    : `Organiza mi menú del ${o.from} al ${o.to}.`);
+  if (nutri) {
+    out.push(`## Mi perfil\n- ${who}\n- Objetivo: ${GOALS[p.goal]}.\n- Restricciones, alergias o cosas que no como: ${p.restrictions.trim() || 'ninguna'}.\n- Porciones por comida: ${p.servings}.`);
+    out.push(`## Prioridad nutricional (metas diarias de referencia para mi perfil${p.age < 19 || p.age > 30 ? '; ajústalas a mi edad' : ''})\n${nutriTargets(p).map(x => '- ' + x).join('\n')}\n\nCada día debe sumar estas metas entre todas sus comidas. No te saltes el desayuno y equilibra cada plato (verdura + proteína + carbohidrato integral).`);
+  }
+  out.push(`## Recetas de mi recetario (usa el nombre exacto)\n${recipes || '- (todavía no tengo recetas)'}\n\n${o.allowNew
+    ? `Usa primero estas recetas. Si con ellas no se cubren bien ${nutri ? 'las metas nutricionales' : 'todas las comidas'} o se repiten demasiado, propón recetas nuevas${nutri ? ' equilibradas' : ''} en "recipes", completas con ingredientes y pasos${nutri ? ', y anota en "notes" su aporte aproximado por porción (kcal, proteína y el micronutriente que más aporta)' : ''}.`
+    : 'Usa SOLO recetas de esta lista.'}`);
+  out.push(`## Formato de respuesta\nResponde ÚNICAMENTE con un JSON válido, sin texto antes ni después (puede ir dentro de un bloque \`\`\`json):\n{\n${o.allowNew ? `  "recipes": [\n${RECIPE_FORMAT}\n  ],\n` : ''}  "plan": [\n    { "date": "${o.from}", "recipe": "Nombre exacto", "meal": "desayuno", "time": "08:00", "servings": ${p.servings} }\n  ]${nutri ? ',\n  "nutritionNotes": "Resumen breve de cómo el plan cubre las metas"' : ''}\n}\n\nReglas:\n- "recipe" debe coincidir exactamente con un nombre de mi recetario${o.allowNew ? ' o de "recipes"' : ''}.\n- "meal": desayuno, almuerzo, merienda o cena. "time" en HH:MM (24 h).\n- Fechas AAAA-MM-DD entre ${o.from} y ${o.to}${nutri ? ', con las 4 comidas de cada día' : ''}.\n- Evita repetir la misma receta en días seguidos.${o.allowNew ? '\n- En recetas nuevas: "category" (desayuno, almuerzo, merienda, cena, postre u otro), "difficulty" (facil, media o dificil), "quantity" numérica (0 si es al gusto) y unidades cortas (g, ml, taza, cda, pieza…).' : ''}`);
+  out.push(`## Lo que quiero\n${o.extra.trim() || '[Añade aquí detalles: días que como fuera, presupuesto, gustos, tiempo para cocinar…]'}`);
+  return out.join('\n\n');
+}
+
+function profileFields() {
+  const p = profile();
+  return `<details class="profile" ${ui.org.nutri ? 'open' : ''}><summary>Tu perfil: ${p.sex === 'mujer' ? 'mujer' : 'hombre'}, ${esc(p.age)} años, actividad ${esc(p.activity)}</summary>
+    <div class="grid3">
+      <div><label for="pf-sex">Sexo</label><select id="pf-sex" data-chg="profField" data-k="sex"><option value="mujer" ${p.sex === 'mujer' ? 'selected' : ''}>Mujer</option><option value="hombre" ${p.sex === 'hombre' ? 'selected' : ''}>Hombre</option></select></div>
+      <div><label for="pf-age">Edad</label><input id="pf-age" type="number" min="14" max="99" value="${esc(p.age)}" data-chg="profField" data-k="age"></div>
+      <div><label for="pf-weight">Peso (kg)</label><input id="pf-weight" inputmode="decimal" placeholder="Opcional" value="${esc(p.weight)}" data-chg="profField" data-k="weight"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="pf-act">Actividad física</label><select id="pf-act" data-chg="profField" data-k="activity">${Object.entries(ACT_SHORT).map(([k, v]) => `<option value="${k}" ${p.activity === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div><label for="pf-goal">Objetivo</label><select id="pf-goal" data-chg="profField" data-k="goal">${Object.entries(GOAL_SHORT).map(([k, v]) => `<option value="${k}" ${p.goal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+    </div>
+    <div class="grid2">
+      <div><label for="pf-rest">Restricciones o alergias</label><input id="pf-rest" placeholder="Ej. sin lactosa, no como cerdo" value="${esc(p.restrictions)}" data-chg="profField" data-k="restrictions"></div>
+      <div><label for="pf-serv">Porciones por comida</label><input id="pf-serv" type="number" min="1" value="${esc(p.servings)}" data-chg="profField" data-k="servings"></div>
+    </div>
+    <ul class="targets">${nutriTargets(p).slice(0, 7).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+    <p class="muted">Valores orientativos de referencia; no sustituyen la consulta con un nutricionista.</p>
+  </details>`;
+}
+
 function renderOrg() {
   const o = ui.org;
   const presets = [['rest', 'Resto del mes'], ['month', 'Todo el mes'], ['next', 'Próximos 7 días']];
@@ -1174,10 +1245,17 @@ function renderOrg() {
     <button class="link danger-link" data-act="orgClear">Quitar todo lo planificado entre estas fechas</button>
     <div class="dlg-f"><button class="btn" data-act="closeDlg">Cancelar</button><button class="btn primary" data-act="orgApply" ${o.preview.length ? '' : 'disabled'}>${ic('check')}Añadir ${o.preview.length} al calendario</button></div>`;
   } else {
-    body = `<ol class="howto"><li>Copia el prompt: ya incluye los nombres de tus ${S.recipes.length} recetas.</li><li>Pégalo en tu IA y dile cómo quieres organizar el mes.</li><li>Pega aquí su respuesta. Solo se usan recetas de tu recetario.</li></ol>
+    body = `<ol class="howto"><li>Ajusta las opciones y copia el prompt: ya va con formato, tu perfil y los nombres de tus ${S.recipes.length} recetas.</li><li>Pégalo en tu IA (ChatGPT, Claude, Gemini…).</li><li>Pega aquí su respuesta y pulsa «Importar calendario».</li></ol>
     <div class="grid2"><div><label for="og-from">Desde</label><input id="og-from" type="date" value="${o.from}" data-chg="orgRange"></div><div><label for="og-to">Hasta</label><input id="og-to" type="date" value="${o.to}" data-chg="orgRange"></div></div>
-    <div class="row" style="margin-top:12px"><button class="btn" data-act="orgCopyPrompt">${ic('copy')}Copiar prompt</button></div>
-    <label for="og-text">Calendario en JSON</label><textarea id="og-text" placeholder='{"plan": [{"date": "${o.from}", "recipe": "…", "meal": "cena"}]}' style="min-height:150px"></textarea>
+    <div class="opt-box">
+      <label class="check"><input type="checkbox" data-chg="orgOpt" data-k="nutri" ${o.nutri ? 'checked' : ''}> <span><b>Priorizar mi nutrición</b><span class="muted">Energía, proteína, hierro, calcio, vitaminas y fibra que necesito cada día.</span></span></label>
+      ${o.nutri ? profileFields() : ''}
+      <label class="check"><input type="checkbox" data-chg="orgOpt" data-k="allowNew" ${o.allowNew ? 'checked' : ''}> <span><b>Permitir recetas nuevas</b><span class="muted">Si las tuyas no bastan, la IA puede proponer otras; se añadirán a tu recetario.</span></span></label>
+    </div>
+    <label for="og-extra">Algo más que quieras pedir</label><input id="og-extra" value="${esc(o.extra)}" placeholder="Ej. como fuera los sábados, presupuesto ajustado, me gusta lo picante" data-chg="orgExtra">
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="orgCopyPrompt">${ic('copy')}Copiar prompt</button><button class="btn ghost" data-act="orgTogglePrompt" aria-expanded="${o.showPrompt}">${o.showPrompt ? 'Ocultar prompt' : 'Ver prompt'}</button></div>
+    ${o.showPrompt ? `<pre class="prompt big">${esc(planPrompt(o))}</pre>` : ''}
+    <label for="og-text">Respuesta de la IA (JSON)</label><textarea id="og-text" placeholder='{"plan": [{"date": "${o.from}", "recipe": "…", "meal": "cena"}]}' style="min-height:150px"></textarea>
     <label class="btn ghost sm file">${ic('up')}Elegir archivo .json<input id="og-file" type="file" accept="application/json,.json,.txt" hidden></label>
     <p id="og-msg" class="err" role="alert"></p>
     <div class="dlg-f"><button class="btn" data-act="closeDlg">Cancelar</button><button class="btn primary" data-act="orgImport">${ic('check')}Importar calendario</button></div>`;
@@ -1185,6 +1263,13 @@ function renderOrg() {
   openDlg(`<div class="dlg-h"><div><p class="muted">${esc(monthName(ui.month))}</p><h2>Organizar el mes</h2></div><button class="btn icon ghost" data-act="closeDlg" aria-label="Cerrar">${ic('x')}</button></div>
   <div class="seg" role="group"><button class="${o.mode === 'auto' ? 'on' : ''}" data-act="orgMode" data-mode="auto" aria-pressed="${o.mode === 'auto'}">${ic('book')}Armar con mi recetario</button><button class="${o.mode === 'import' ? 'on' : ''}" data-act="orgMode" data-mode="import" aria-pressed="${o.mode === 'import'}">${ic('up')}Importar calendario</button></div>
   ${body}`);
+}
+const readOrgExtra = () => { if (ui.org && $('#og-extra')) ui.org.extra = $('#og-extra').value; };
+function renderOrgKeep() {
+  const txt = $('#og-text') ? $('#og-text').value : '', top = dlg.scrollTop;
+  renderOrg();
+  if ($('#og-text')) $('#og-text').value = txt;
+  dlg.scrollTop = top;
 }
 const snapshotPlan = label => { ui.undo = { plan: JSON.stringify(S.plan), label }; };
 
@@ -1295,20 +1380,27 @@ const A = {
     dates.forEach(d => delete S.plan[d]);
     await save(); orgRefresh(); render(); toast(`${n} platillos quitados`);
   },
-  orgCopyPrompt: () => copyText(planPrompt(ui.org), 'Prompt copiado. Pégalo en tu IA.'),
+  orgCopyPrompt: () => { readOrgExtra(); copyText(planPrompt(ui.org), 'Prompt copiado. Pégalo en tu IA.'); },
+  orgTogglePrompt: () => { readOrgExtra(); ui.org.showPrompt = !ui.org.showPrompt; renderOrgKeep(); },
   orgImport: async () => {
     const txt = $('#og-text').value;
     try {
       const before = JSON.stringify(S.plan);
       let data;
       try { data = JSON.parse(extractJSON(txt)); } catch { data = null; }
-      if (data && !Array.isArray(data) && Array.isArray(data.recipes) && data.recipes.length) throw new Error('Este JSON trae recetas nuevas. Impórtalo desde Recetario, «Importar con IA».');
+      const hasRecipes = data && !Array.isArray(data) && Array.isArray(data.recipes) && data.recipes.length;
+      if (hasRecipes && !ui.org.allowNew) throw new Error('La respuesta trae recetas nuevas. Activa «Permitir recetas nuevas» o impórtalas desde Recetario.');
+      if (!hasRecipes && !(Array.isArray(data) || (data && Array.isArray(data.plan)))) throw new Error('El JSON no trae un "plan". Pide a la IA que responda con el formato del prompt.');
+      const recipesBefore = S.recipes;
       const wrapped = Array.isArray(data) ? JSON.stringify({ plan: data }) : txt;
       const res = importAI(wrapped, false);
-      if (!res.planned) throw new Error(res.skipped.length ? `Ninguna entrada coincide con tu recetario (${res.skipped.slice(0, 3).join(', ')}…). Revisa que los nombres sean exactos.` : 'El JSON no trae entradas de plan.');
+      if (!res.planned) {
+        S.recipes = recipesBefore;
+        throw new Error(res.skipped.length ? `Ninguna entrada del plan coincide con tus recetas (${res.skipped.slice(0, 3).join(', ')}…). Revisa que los nombres sean exactos.` : 'El JSON no trae entradas de plan.');
+      }
       ui.undo = { plan: before, label: `importar ${res.planned} platillos` };
       await save(); closeDlg(); render();
-      toast(`Calendario importado: ${res.planned} platillos${res.skipped.length ? `, ${res.skipped.length} omitidos` : ''}`);
+      toast(`Calendario importado: ${res.planned} platillos${res.added ? `, ${res.added} recetas nuevas en tu recetario` : ''}${res.skipped.length ? `, ${res.skipped.length} omitidos` : ''}`);
     } catch (e) { $('#og-msg').textContent = e.message; }
   },
   undoPlan: async () => { if (!ui.undo) return; S.plan = JSON.parse(ui.undo.plan); ui.undo = null; await save(); render(); toast('Cambio deshecho'); },
@@ -1510,6 +1602,16 @@ const C = {
     if (ui.org.from > ui.org.to) ui.org.to = ui.org.from;
     ui.org.preset = '';
     if (ui.org.mode === 'auto') orgRefresh(); else renderOrg();
+  },
+  orgOpt: (d, el) => { readOrgExtra(); ui.org[d.k] = el.checked; renderOrgKeep(); },
+  orgExtra: (d, el) => { ui.org.extra = el.value; if (ui.org.showPrompt) renderOrgKeep(); },
+  profField: async (d, el) => {
+    const p = profile();
+    let v = el.value;
+    if (d.k === 'age') v = Math.min(99, Math.max(14, Math.round(num(v, 22)) || 22));
+    if (d.k === 'servings') v = Math.max(1, Math.round(num(v, 1)) || 1);
+    if (d.k === 'weight') v = num(v, 0) ? String(num(v, 0)) : '';
+    p[d.k] = v; S.profile = p; await save(); readOrgExtra(); renderOrgKeep();
   },
   orgSkip: (d, el) => { ui.org.skipFilled = el.checked; orgRefresh(); },
   orgGap: (d, el) => { ui.org.gap = Number(el.value); orgRefresh(); },

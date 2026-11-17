@@ -40,3 +40,9 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - Temporizador estilo reloj: anillo que se vacía, pausa/reanudar/reiniciar/+1:00, al terminar el anillo late en rojo y cuenta en negativo. Panel "Temporizadores" con tiempos rápidos y personalizado (min/seg). En modo cocinar se ven los anillos debajo del paso.
 - Compras: varias listas (`lists[]`), creadas desde el plan (rango de fechas) o vacías. Artículos editables (nombre, cantidad, unidad, pasillo), añadir a mano, renombrar, duplicar, eliminar, "Actualizar desde el plan" (no pisa lo editado ni recupera lo borrado). Datos antiguos `shop.extra` migran a "Mi lista".
 - Calendario: "Organizar el mes" arma el plan con recetas del recetario (fechas, comidas, todas o favoritas, días sin repetir, respetar lo ya planificado, vista previa y mezclar), o importa un calendario JSON `{"plan":[{date,recipe,meal,time,servings}]}` con prompt que incluye los nombres de tus recetas. Botón "Deshacer" tras aplicar.
+
+## Prompt nutricional (Organizar el mes, Importar calendario)
+- Perfil guardado en `profile` (sexo, edad, peso opcional, actividad, objetivo, restricciones, porciones). Por defecto: mujer, 22 años, actividad moderada, objetivo energía y rendimiento.
+- "Priorizar mi nutrición" genera un prompt con secciones (perfil, metas diarias de referencia: energía, proteína, fibra, hierro + vitamina C, calcio, vitamina D, folato, B12, magnesio, zinc, omega-3, variedad, hidratación), recetas del recetario y formato JSON.
+- "Permitir recetas nuevas": la IA puede añadir recetas equilibradas (con aporte aproximado en notas); al importar se agregan al recetario y al plan.
+- Valores orientativos; la app aclara que no sustituyen a un nutricionista.
