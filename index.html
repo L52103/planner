@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planner de Recetas</title>
+<meta name="theme-color" content="#d9622b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="timers" aria-live="polite"></div>
+<main id="view"></main>
+<nav id="nav">
+  <button data-act="nav" data-view="calendar"><i>📅</i><span>Mes</span></button>
+  <button data-act="nav" data-view="recipes"><i>📖</i><span>Recetas</span></button>
+  <button data-act="nav" data-view="shop"><i>🛒</i><span>Compras</span></button>
+  <button data-act="nav" data-view="data"><i>⚙️</i><span>Datos</span></button>
+</nav>
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
