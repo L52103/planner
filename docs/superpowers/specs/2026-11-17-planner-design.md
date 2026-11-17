@@ -34,3 +34,9 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - Compras agrupadas por pasillo, con progreso y compartir.
 - Cocinar: lista de ingredientes marcable, lista de pasos navegable, temporizador sugerido si el texto menciona minutos; al terminar marca el platillo como hecho.
 - Paleta "huerto" (albahaca, azafrán, tomate) y tipografías Bricolage Grotesque + Atkinson Hyperlegible.
+
+## Versión 3 (edición, temporizador circular, listas, organizar el mes)
+- Recetario: modo "Organizar" con selección múltiple (cambiar categoría, favoritas, eliminar), botón editar en cada tarjeta y eliminar desde el editor.
+- Temporizador estilo reloj: anillo que se vacía, pausa/reanudar/reiniciar/+1:00, al terminar el anillo late en rojo y cuenta en negativo. Panel "Temporizadores" con tiempos rápidos y personalizado (min/seg). En modo cocinar se ven los anillos debajo del paso.
+- Compras: varias listas (`lists[]`), creadas desde el plan (rango de fechas) o vacías. Artículos editables (nombre, cantidad, unidad, pasillo), añadir a mano, renombrar, duplicar, eliminar, "Actualizar desde el plan" (no pisa lo editado ni recupera lo borrado). Datos antiguos `shop.extra` migran a "Mi lista".
+- Calendario: "Organizar el mes" arma el plan con recetas del recetario (fechas, comidas, todas o favoritas, días sin repetir, respetar lo ya planificado, vista previa y mezclar), o importa un calendario JSON `{"plan":[{date,recipe,meal,time,servings}]}` con prompt que incluye los nombres de tus recetas. Botón "Deshacer" tras aplicar.
