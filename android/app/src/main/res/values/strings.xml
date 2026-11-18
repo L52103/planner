@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Planner de Recetas</string>
+    <string name="title_activity_main">Planner de Recetas</string>
+    <string name="package_name">com.l52103.planner</string>
+    <string name="custom_url_scheme">com.l52103.planner</string>
+</resources>

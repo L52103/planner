@@ -1,0 +1,27 @@
+{
+  "name": "planner-recetas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Planner de recetas: PWA + app Android (Capacitor)",
+  "scripts": {
+    "fonts": "node scripts/copy-fonts.mjs",
+    "serve": "python3 -m http.server 8123 --directory www",
+    "sync": "npm run fonts && npx cap sync android",
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/clipboard": "^8.0.1",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/bricolage-grotesque": "^5.3.0"
+  }
+}

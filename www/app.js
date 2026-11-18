@@ -129,6 +129,42 @@ const Store = {
   },
 };
 
+/* ───────── capa nativa (app Android con Capacitor) ───────── */
+const CAP = window.Capacitor;
+const IS_NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+const NP = IS_NATIVE ? CAP.Plugins : {};
+const Native = {
+  // Id numérico estable a partir del id del temporizador (las notificaciones nativas usan enteros)
+  nid: id => { let h = 7; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) % 2000000000 + 1; },
+  channelReady: null,
+  async ensureChannel() {
+    if (!NP.LocalNotifications) return;
+    this.channelReady = this.channelReady || NP.LocalNotifications.createChannel({ id: 'timers', name: 'Temporizadores', description: 'Avisos cuando termina un temporizador de cocina', importance: 5, visibility: 1, vibration: true }).catch(() => {});
+    return this.channelReady;
+  },
+  async askNotifications() {
+    if (!NP.LocalNotifications) return false;
+    try { const p = await NP.LocalNotifications.requestPermissions(); return p.display === 'granted'; } catch { return false; }
+  },
+  // Reprograma las alarmas nativas para que suenen aunque la app esté cerrada o la pantalla apagada
+  async syncTimers(list) {
+    const LN = NP.LocalNotifications;
+    if (!LN) return;
+    try {
+      await this.ensureChannel();
+      const pend = await LN.getPending();
+      if (pend.notifications.length) await LN.cancel({ notifications: pend.notifications.map(n => ({ id: n.id })) });
+      const now = Date.now();
+      const due = list.filter(t => !t.fired && !t.paused && t.endAt > now + 500);
+      if (due.length) await LN.schedule({ notifications: due.map(t => ({ id: this.nid(t.id), title: t.label, body: 'El temporizador terminó', channelId: 'timers', smallIcon: 'ic_stat_timer', schedule: { at: new Date(t.endAt), allowWhileIdle: true } })) });
+    } catch {}
+  },
+  async saveFile(name, text) {
+    const r = await NP.Filesystem.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
+    await NP.Share.share({ title: name, files: [r.uri], dialogTitle: 'Guardar o enviar el respaldo' });
+  },
+};
+
 /* ───────── estado ───────── */
 const emptyState = () => ({ version: 2, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null });
 let S = emptyState();
@@ -289,7 +325,7 @@ const ui = {
 /* ───────── temporizadores (anillo circular, estilo reloj) ───────── */
 let timers = [];
 try { timers = JSON.parse(localStorage.getItem('planner.timers') || '[]'); } catch { timers = []; }
-const saveTimers = () => { try { localStorage.setItem('planner.timers', JSON.stringify(timers)); } catch {} };
+const saveTimers = () => { try { localStorage.setItem('planner.timers', JSON.stringify(timers)); } catch {} if (IS_NATIVE) Native.syncTimers(timers); };
 
 let actx = null, alarmIv = null;
 function unlockAudio() {
@@ -322,6 +358,7 @@ function stopAlarm() { clearInterval(alarmIv); alarmIv = null; }
 const syncAlarm = () => { if (!timers.some(x => x.fired)) stopAlarm(); };
 
 async function notify(title) {
+  if (IS_NATIVE) return; // la notificación nativa ya está programada
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
@@ -340,7 +377,8 @@ function addTimer(minutes, label) {
   timers.push({ id: uid(), label, total, endAt: Date.now() + total * 1000, fired: false, paused: false, remaining: total, firedAt: 0 });
   saveTimers();
   unlockAudio();
-  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch {}
+  if (IS_NATIVE) Native.askNotifications();
+  else try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch {}
   renderTimers();
   toast(`Temporizador de ${fmtMin(minutes)} iniciado`);
 }
@@ -1275,6 +1313,7 @@ const snapshotPlan = label => { ui.undo = { plan: JSON.stringify(S.plan), label 
 
 /* ───────── ayudas ───────── */
 async function copyText(text, okMsg) {
+  if (IS_NATIVE && NP.Clipboard) { try { await NP.Clipboard.write({ string: text }); toast(okMsg); return true; } catch {} }
   try { await navigator.clipboard.writeText(text); toast(okMsg); return true; }
   catch {
     const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
@@ -1282,7 +1321,13 @@ async function copyText(text, okMsg) {
     ta.remove(); toast(ok ? okMsg : 'No se pudo copiar'); return ok;
   }
 }
+async function shareText(title, text) {
+  if (IS_NATIVE && NP.Share) { try { await NP.Share.share({ title, text, dialogTitle: title }); return true; } catch { return false; } }
+  if (navigator.share) { try { await navigator.share({ title, text }); return true; } catch (e) { if (e.name === 'AbortError') return true; } }
+  return false;
+}
 function download(name, text) {
+  if (IS_NATIVE && NP.Filesystem && NP.Share) { Native.saveFile(name, text).catch(() => toast('No se pudo exportar el archivo')); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -1488,7 +1533,7 @@ const A = {
   exportAll: () => { download(`planner-respaldo-${ymd(new Date())}.json`, JSON.stringify({ app: 'planner', ...S }, null, 2)); toast('Respaldo exportado'); },
   exportRecipes: () => { download(`recetas-${ymd(new Date())}.json`, JSON.stringify({ schema: 'planner/2', recipes: S.recipes.map(exportRecipe) }, null, 2)); toast('Recetas exportadas'); },
   pickBackup: () => $('#backupFile').click(),
-  askNotif: async () => { try { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notificaciones activadas' : 'El navegador no dio permiso'); } catch { toast('Este navegador no admite notificaciones'); } },
+  askNotif: async () => { if (IS_NATIVE) { toast(await Native.askNotifications() ? 'Notificaciones activadas' : 'Activa las notificaciones en los ajustes de Android'); return; } try { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notificaciones activadas' : 'El navegador no dio permiso'); } catch { toast('Este navegador no admite notificaciones'); } },
   wipe: async () => { if (!confirm('¿Borrar todas las recetas, el plan y la lista de compras de este dispositivo?')) return; S = emptyState(); await save(); render(); toast('Datos borrados'); },
 
   /* listas de compras */
@@ -1513,7 +1558,7 @@ const A = {
   listShare: async d => {
     const l = getList(d.id), text = listText(l);
     if (!text) return toast('No queda nada por comprar');
-    if (navigator.share) { try { await navigator.share({ title: l.name, text }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+    if (await shareText(l.name, text)) return;
     copyText(text, 'Lista copiada');
   },
   listUncheck: async d => { getList(d.id).items.forEach(i => { i.checked = false; }); await save(); render(); },
@@ -1684,8 +1729,8 @@ document.addEventListener('submit', async e => {
 
 /* pantalla encendida mientras se cocina */
 let wake = null;
-async function requestWake() { try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch {} }
-function releaseWake() { try { wake && wake.release(); } catch {} wake = null; }
+async function requestWake() { if (IS_NATIVE && NP.KeepAwake) { NP.KeepAwake.keepAwake().catch(() => {}); return; } try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch {} }
+function releaseWake() { if (IS_NATIVE && NP.KeepAwake) { NP.KeepAwake.allowSleep().catch(() => {}); return; } try { wake && wake.release(); } catch {} wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (ui.cook) requestWake(); tick(); } });
 
 /* ───────── inicio ───────── */
@@ -1696,6 +1741,21 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   render();
   tick();
   setInterval(tick, 250);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!IS_NATIVE && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (IS_NATIVE) {
+    document.documentElement.classList.add('native');
+    Native.syncTimers(timers);
+    // Botón «atrás» de Android: cierra diálogos y vuelve a la pantalla anterior antes de salir
+    NP.App && NP.App.addListener('backButton', () => {
+      if (dlg.open) return closeDlg();
+      if (ui.view === 'cook') return A.cookExit();
+      const parent = { recipe: 'book', editor: ui.returnTo || 'book', list: 'shop' }[ui.view];
+      if (parent) { if (ui.view === 'editor') { ui.draft = null; ui.pendingPlan = null; } return go(parent); }
+      if (ui.view !== 'today') return go('today');
+      NP.App.minimizeApp ? NP.App.minimizeApp() : NP.App.exitApp();
+    });
+    // Al tocar la notificación de un temporizador, abrir el panel
+    NP.LocalNotifications && NP.LocalNotifications.addListener('localNotificationActionPerformed', () => { tick(); timerSheet(); });
+  }
 })();
 })();

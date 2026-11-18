@@ -1,0 +1,12 @@
+{
+  "appId": "com.l52103.planner",
+  "appName": "Planner de Recetas",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F3F5F0"
+  },
+  "plugins": {
+    "SystemBars": { "insetsHandling": "css", "style": "DEFAULT" },
+    "LocalNotifications": { "smallIcon": "ic_stat_timer", "iconColor": "#1F5C43" }
+  }
+}

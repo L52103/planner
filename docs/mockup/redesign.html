@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planner rediseño</title>
+<link rel="stylesheet" href="../../www/fonts.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+:root{
+  --bg:#F3F5F0;--surface:#fff;--surface-2:#E9EDE5;--ink:#18231D;--muted:#5E6B63;--line:#DCE2D8;
+  --brand:#1F5C43;--brand-2:#2D7A5A;--brand-soft:#DDEBE2;--saffron:#E9A93A;--tomato:#D9472F;
+  --m-des:#D99A22;--m-alm:#3F8F5F;--m-mer:#A85A92;--m-cen:#3E5C9A;--m-pos:#CF5B6F;
+  --f-d:"Bricolage Grotesque",system-ui,sans-serif;--f-b:"Atkinson Hyperlegible",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#D9DED5;color:var(--ink);font:15px/1.45 var(--f-b)}
+.page{max-width:1500px;margin:0 auto;padding:40px 24px 80px}
+.intro{max-width:760px;margin-bottom:36px}
+.intro h1{font-family:var(--f-d);font-weight:800;font-size:clamp(2rem,5vw,3.2rem);line-height:1.05;margin:0 0 12px;letter-spacing:-.02em}
+.intro p{font-size:1.05rem;color:var(--muted);margin:0 0 8px}
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:22px 0 0;padding:0;list-style:none}
+.principles li{background:var(--surface);border-radius:16px;padding:14px 16px}
+.principles b{display:block;font-family:var(--f-d);font-size:1.02rem;margin-bottom:2px}
+.principles span{color:var(--muted);font-size:.92rem}
+.row{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start;margin-top:40px}
+.shot{display:flex;flex-direction:column;gap:12px;width:390px;max-width:100%}
+.shot h2{font-family:var(--f-d);font-size:1.25rem;margin:0}
+.shot p.note{margin:0;color:var(--muted);font-size:.92rem}
+.shot ul.chg{margin:0;padding-left:18px;color:var(--ink);font-size:.9rem}
+.shot ul.chg li{padding:1px 0}
+.new{display:inline-block;background:var(--saffron);color:#1b1206;font-weight:700;font-size:.72rem;border-radius:99px;padding:1px 8px;margin-left:6px;vertical-align:middle}
+
+/* teléfono */
+.phone{position:relative;width:390px;height:844px;max-width:100%;border-radius:46px;background:var(--bg);overflow:hidden;box-shadow:0 0 0 10px #10140f,0 30px 60px -20px rgba(0,0,0,.45);display:flex;flex-direction:column}
+.sb{height:42px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-weight:700;font-size:.82rem}
+.scr{flex:1;overflow:hidden;position:relative}
+.scr .shop-h + .aisles + .sec .swipe-wrap{overflow:hidden}
+.pad{padding:6px 20px}
+.dark .sb{color:#E7EEE9}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.f{fill:currentColor;stroke:none}
+
+/* barra inferior con botón central */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--surface);display:grid;grid-template-columns:1fr 1fr 84px 1fr 1fr;align-items:start;padding-top:10px;box-shadow:0 -1px 0 var(--line)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.7rem;color:var(--muted)}
+.tab .ic{width:24px;height:24px}
+.tab.on{color:var(--brand);font-weight:700}
+.tab.on .pill{background:var(--brand-soft)}
+.pill{display:grid;place-items:center;width:56px;height:30px;border-radius:99px}
+.fab{justify-self:center;margin-top:-28px;width:62px;height:62px;border-radius:22px;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:0 10px 22px -8px rgba(31,92,67,.7)}
+.fab .ic{width:28px;height:28px;stroke-width:2.4}
+
+/* plato */
+.plate{--s:48px;--c:var(--m-alm);width:var(--s);height:var(--s);border-radius:50%;flex:none;display:grid;place-items:center;font-size:calc(var(--s)*.5);
+  background:radial-gradient(circle,#fff 0 54%,color-mix(in srgb,var(--c) 24%,#fff) 55%);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent)}
+.c-des{--c:var(--m-des)}.c-alm{--c:var(--m-alm)}.c-mer{--c:var(--m-mer)}.c-cen{--c:var(--m-cen)}.c-pos{--c:var(--m-pos)}
+
+/* HOY */
+.hello{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 20px 0}
+.hello small{color:var(--muted);font-size:.85rem}
+.hello h3{font-family:var(--f-d);font-weight:800;font-size:1.9rem;margin:0;letter-spacing:-.02em;line-height:1.1}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--surface);display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line)}
+.next{margin:16px 20px 0;border-radius:26px;background:var(--m-des);color:#1b1206;padding:18px;position:relative;overflow:hidden}
+.next::after{content:"";position:absolute;right:-50px;top:-50px;width:190px;height:190px;border-radius:50%;background:rgba(255,255,255,.18)}
+.next .when{font-family:var(--f-d);font-weight:800;font-size:2.3rem;line-height:1;letter-spacing:-.02em}
+.next .when small{font-size:.95rem;font-family:var(--f-b);font-weight:700;opacity:.75;margin-left:6px;letter-spacing:0}
+.next h4{font-family:var(--f-d);font-size:1.25rem;margin:10px 0 2px;position:relative;z-index:1}
+.next p{margin:0;font-size:.88rem;opacity:.8}
+.next .plate{position:absolute;right:18px;top:18px;--s:86px;z-index:1}
+.next .go{margin-top:14px;display:flex;gap:8px;position:relative;z-index:1}
+.b{display:inline-flex;align-items:center;gap:7px;border-radius:99px;padding:9px 16px;font-weight:700;font-size:.88rem;background:var(--surface);color:var(--ink);white-space:nowrap}
+.b.p{background:var(--brand);color:#fff}
+.b.ink{background:#1b1206;color:#fff}
+.b.gh{background:rgba(255,255,255,.55)}
+.b .ic{width:16px;height:16px}
+.nutri{margin:14px 20px 0;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--surface);border-radius:22px;padding:14px 16px}
+.rings{position:relative;width:76px;height:76px}
+.rings svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.rings circle{fill:none;stroke-width:7;stroke-linecap:round}
+.nutri h5{margin:0 0 6px;font-family:var(--f-d);font-size:1rem}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:56px 1fr 74px;gap:8px;align-items:center;font-size:.78rem}
+.bar i{display:block;height:6px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.bar i b{display:block;height:100%;border-radius:9px}
+.bar span:last-child{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl{margin:16px 20px 0;position:relative}
+.tl h5{font-family:var(--f-d);font-size:1.05rem;margin:0 0 8px}
+.ti{display:grid;grid-template-columns:46px 1fr;gap:10px;align-items:center;padding:7px 0;position:relative}
+.ti time{font-family:var(--f-d);font-weight:800;font-size:.95rem;font-variant-numeric:tabular-nums;color:var(--muted)}
+.ti .card{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:18px;padding:10px 12px;border-left:4px solid var(--c)}
+.ti .card b{font-family:var(--f-d);font-size:.98rem;display:block;line-height:1.2}
+.ti .card span{font-size:.78rem;color:var(--muted)}
+.ti.done .card{opacity:.55}
+.ti.done .card b{text-decoration:line-through}
+.now{display:grid;grid-template-columns:46px 1fr;gap:10px;align-items:center;margin:2px 0}
+.now span{font-size:.72rem;font-weight:700;color:var(--tomato)}
+.now i{height:2px;background:var(--tomato);border-radius:2px;position:relative}
+.now i::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--tomato)}
+.ti .empty{border:1.5px dashed var(--line);border-radius:18px;padding:12px;color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:8px}
+
+/* SEMANA */
+.top{display:flex;justify-content:space-between;align-items:center;padding:6px 20px 0}
+.top h3{font-family:var(--f-d);font-weight:800;font-size:1.65rem;margin:0;letter-spacing:-.02em}
+.seg{display:flex;background:var(--surface-2);border-radius:99px;padding:3px;font-size:.8rem;font-weight:700}
+.seg span{padding:6px 12px;border-radius:99px;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.wkstrip{display:flex;gap:6px;padding:14px 20px 4px}
+.wk{flex:1;text-align:center;border-radius:16px;padding:8px 0;background:var(--surface)}
+.wk small{display:block;font-size:.68rem;color:var(--muted)}
+.wk b{font-family:var(--f-d);font-size:1.1rem}
+.wk.on{background:var(--ink);color:#fff}
+.wk.on small{color:#cfd8d2}
+.menu{margin:12px 20px 0;display:grid;grid-template-columns:62px repeat(3,1fr);gap:6px;font-size:.72rem}
+.menu .h{font-weight:700;color:var(--muted);text-align:center;padding-bottom:2px}
+.menu .ml{display:flex;align-items:center;gap:5px;font-weight:700;color:var(--muted)}
+.menu .ml i{width:8px;height:8px;border-radius:3px;background:var(--c);transform:rotate(45deg)}
+.cell{background:var(--surface);border-radius:14px;padding:7px 6px;min-height:76px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;line-height:1.15}
+.cell .plate{--s:34px}
+.cell.add{background:transparent;border:1.5px dashed var(--line);justify-content:center;color:var(--muted);font-size:1.2rem}
+.tip{margin:14px 20px 0;background:var(--brand);color:#fff;border-radius:20px;padding:14px 16px;display:flex;gap:12px;align-items:center}
+.tip b{font-family:var(--f-d);display:block}
+.tip span{font-size:.82rem;opacity:.85}
+
+/* RECETARIO */
+.search{margin:12px 20px 0;display:flex;gap:8px;align-items:center;background:var(--surface);border-radius:99px;padding:11px 16px;color:var(--muted);font-size:.9rem}
+.chips{display:flex;gap:7px;padding:12px 20px 0;overflow:hidden}
+.chip{white-space:nowrap;border-radius:99px;padding:6px 12px;font-weight:700;font-size:.8rem;background:var(--surface);display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:var(--ink);color:#fff}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 20px}
+.tile{border-radius:24px;padding:12px;background:color-mix(in srgb,var(--c) 14%,#fff);display:flex;flex-direction:column;gap:6px;position:relative}
+.tile .plate{--s:96px;align-self:center;margin:8px 0 4px;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent),0 12px 20px -12px color-mix(in srgb,var(--c) 90%,transparent)}
+.tile b{font-family:var(--f-d);font-size:.98rem;line-height:1.15}
+.tile .m{display:flex;gap:8px;font-size:.72rem;color:var(--muted)}
+.tile .star{position:absolute;top:10px;right:10px;color:var(--saffron)}
+.tile .kc{position:absolute;top:10px;left:10px;background:#fff;border-radius:99px;font-size:.68rem;font-weight:700;padding:2px 8px}
+
+/* DETALLE */
+.hero{background:var(--m-alm);color:#fff;padding:8px 20px 22px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-70px;bottom:-90px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.12)}
+.hero .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.hero .nav span{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.hero .plate{--s:120px;--c:#fff;box-shadow:0 18px 30px -16px rgba(0,0,0,.5);margin:2px 0 12px}
+.hero small{font-weight:700;opacity:.85}
+.hero h3{font-family:var(--f-d);font-weight:800;font-size:1.7rem;margin:2px 0 10px;line-height:1.1;position:relative;z-index:1}
+.facts{display:flex;gap:18px;position:relative;z-index:1}
+.facts div b{display:block;font-family:var(--f-d);font-size:1.05rem}
+.facts div span{font-size:.72rem;opacity:.8}
+.tabs{display:flex;gap:4px;margin:14px 20px 0;background:var(--surface-2);border-radius:99px;padding:4px}
+.tabs span{flex:1;text-align:center;padding:8px 0;border-radius:99px;font-weight:700;font-size:.85rem;color:var(--muted)}
+.tabs span.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.ings{list-style:none;margin:10px 20px 0;padding:0}
+.ings li{display:grid;grid-template-columns:1fr auto;padding:10px 2px;border-bottom:1px solid var(--line);font-size:.92rem}
+.ings li b{font-variant-numeric:tabular-nums}
+.serv{display:flex;justify-content:space-between;align-items:center;margin:12px 20px 0;font-size:.85rem;color:var(--muted)}
+.stp{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:99px;padding:4px}
+.stp span{width:30px;height:30px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink)}
+.stp b{color:var(--ink);font-size:.9rem}
+.actbar{position:absolute;left:0;right:0;bottom:0;padding:12px 20px 26px;background:linear-gradient(transparent,var(--bg) 30%);display:flex;gap:10px}
+.actbar .b{flex:1;justify-content:center;padding:14px}
+
+/* COCINAR (oscuro) */
+.dark{background:#0F1A14;color:#E7EEE9}
+.ck-top{display:flex;justify-content:space-between;align-items:center;padding:4px 20px}
+.ck-top span{font-size:.85rem;color:#9BB0A3}
+.ck-prog{display:flex;gap:5px;padding:12px 20px 0}
+.ck-prog i{flex:1;height:5px;border-radius:9px;background:#2A3A31}
+.ck-prog i.d{background:#7FD1A3}
+.ck-prog i.n{background:linear-gradient(90deg,#7FD1A3 40%,#2A3A31 40%)}
+.ck-step{padding:26px 22px 0}
+.ck-step small{font-family:var(--f-d);font-weight:800;color:#7FD1A3;font-size:1rem}
+.ck-step p{font-family:var(--f-d);font-weight:600;font-size:1.85rem;line-height:1.28;margin:10px 0 0;letter-spacing:-.01em}
+.ck-ing{display:flex;gap:6px;flex-wrap:wrap;padding:16px 22px 0}
+.ck-ing span{border:1.5px solid #2E4036;border-radius:99px;padding:5px 11px;font-size:.8rem;color:#C9D6CE}
+.ck-timer{margin:22px auto 0;width:210px;height:210px;position:relative}
+.ck-timer svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ck-timer circle{fill:none;stroke-width:9;stroke-linecap:round}
+.ck-timer div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ck-timer b{font-family:var(--f-d);font-weight:600;font-size:3rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ck-timer span{font-size:.8rem;color:#9BB0A3}
+.ck-ctrl{display:flex;justify-content:center;gap:10px;margin-top:14px}
+.ck-ctrl span{border-radius:99px;padding:9px 16px;font-weight:700;font-size:.85rem;background:#1E2B24;color:#E7EEE9}
+.ck-ctrl span.p{background:#7FD1A3;color:#0E1A13}
+.ck-nav{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 2fr;gap:10px;padding:16px 20px 30px}
+.ck-nav span{border-radius:22px;padding:18px;text-align:center;font-weight:800;font-family:var(--f-d);font-size:1.05rem;background:#1E2B24}
+.ck-nav span.p{background:#7FD1A3;color:#0E1A13}
+.swipe{text-align:center;font-size:.75rem;color:#6F8478;margin-top:10px}
+
+/* COMPRAS */
+.shop-h{padding:6px 20px 0}
+.shop-h small{color:var(--muted)}
+.prog{display:flex;gap:10px;align-items:center;margin-top:10px}
+.prog i{flex:1;height:10px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.prog i b{display:block;height:100%;width:38%;background:var(--brand);border-radius:9px}
+.prog span{font-family:var(--f-d);font-weight:800;font-variant-numeric:tabular-nums}
+.aisles{display:flex;gap:7px;padding:12px 20px 0;overflow:hidden}
+.sec{margin:14px 20px 0}
+.sec h5{font-family:var(--f-d);font-size:.95rem;margin:0 0 4px;display:flex;justify-content:space-between}
+.sec h5 span{color:var(--muted);font-family:var(--f-b);font-weight:400;font-size:.82rem}
+.it{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;padding:10px 12px;background:var(--surface);border-radius:14px;margin-bottom:6px}
+.it .cb{width:24px;height:24px;border-radius:8px;border:2px solid var(--line)}
+.it.ok .cb{background:var(--brand);border-color:var(--brand);display:grid;place-items:center;color:#fff}
+.it.ok .t{text-decoration:line-through;opacity:.5}
+.it .t small{display:block;font-size:.72rem;color:var(--muted)}
+.it .q{font-family:var(--f-d);font-weight:800;font-variant-numeric:tabular-nums;font-size:.92rem}
+.swipe-wrap{position:relative;border-radius:14px;background:var(--brand);margin-bottom:6px}
+.swipe-wrap::before{content:"Comprado";position:absolute;left:14px;top:0;bottom:0;display:flex;align-items:center;color:#fff;font-size:.78rem;font-weight:700}
+.swipe-wrap .it{transform:translateX(92px);margin:0;box-shadow:-6px 0 12px -8px rgba(0,0,0,.4)}
+
+/* hoja rápida */
+.scrim{position:absolute;inset:0;background:rgba(15,26,20,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:28px 28px 0 0;padding:10px 20px 30px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 14px}
+.sheet h4{font-family:var(--f-d);font-size:1.2rem;margin:0 0 12px}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qa div{border-radius:20px;padding:14px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.qa div .ic{width:26px;height:26px;color:var(--brand)}
+.qa div b{font-family:var(--f-d);font-size:.98rem}
+.qa div span{font-size:.78rem;color:var(--muted)}
+
+/* escritorio */
+.desk-wrap{margin-top:56px}
+.desk-wrap h2{font-family:var(--f-d);font-size:1.4rem;margin:0 0 6px}
+.desk{width:100%;max-width:1280px;aspect-ratio:16/9.6;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 0 0 8px #10140f,0 30px 60px -20px rgba(0,0,0,.45);display:grid;grid-template-columns:220px 1fr 330px;margin-top:16px;font-size:13px}
+.side{background:var(--surface);padding:22px 14px;display:flex;flex-direction:column;gap:4px}
+.side .brand{font-family:var(--f-d);font-weight:800;font-size:1.15rem;padding:0 8px 18px;display:flex;gap:8px;align-items:center}
+.side .brand i{width:28px;height:28px;border-radius:9px;background:var(--brand)}
+.side span{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;color:var(--muted)}
+.side span.on{background:var(--brand-soft);color:var(--brand);font-weight:700}
+.side .new-b{margin-top:auto;background:var(--brand);color:#fff;justify-content:center;font-weight:700;border-radius:99px}
+.dmain{padding:24px 26px;overflow:hidden}
+.dmain h3{font-family:var(--f-d);font-weight:800;font-size:1.9rem;margin:0;letter-spacing:-.02em}
+.dgrid{display:grid;grid-template-columns:80px repeat(7,1fr);gap:6px;margin-top:16px}
+.dgrid .h{text-align:center;font-weight:700;color:var(--muted);padding:4px 0}
+.dgrid .h.on{color:var(--ink)}
+.dgrid .h.on b{background:var(--saffron);border-radius:99px;padding:0 7px}
+.dgrid .cell{min-height:86px}
+.dgrid .cell.sel{box-shadow:inset 0 0 0 2px var(--brand)}
+.dpanel{background:var(--surface);padding:22px 20px;border-left:1px solid var(--line);overflow:hidden}
+.dpanel h4{font-family:var(--f-d);font-size:1.3rem;margin:0}
+.dpanel .ti .card{background:var(--bg)}
+@media (max-width:860px){.desk{display:none}.desk-wrap p.only{display:block}}
+.desk-wrap p.only{display:none;color:var(--muted)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M5 18a3 3 0 0 1 3-3h10M9 8h5"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12h12l2-8H6.2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 11l7.6-4M8.2 13l7.6 4"/></symbol>
+</svg>
+
+<div class="page">
+  <header class="intro">
+    <h1>Planner de recetas, rediseño para Android y PC</h1>
+    <p>Propuesta visual antes de tocar el código. Mantiene lo que ya funciona (el «plato» de cada receta, los colores por comida, la paleta de huerto) y lo lleva a un formato de app nativa: menos tarjetas con borde, más bloques de color, números grandes y un botón central para añadir cualquier cosa.</p>
+    <p>Lo marcado como <span class="new">nuevo</span> son funciones que no existen hoy y que propongo sumar con el rediseño.</p>
+    <ul class="principles">
+      <li><b>Una acción a un toque</b><span>El botón «+» central abre accesos rápidos: platillo para hoy, receta, temporizador o artículo de compras.</span></li>
+      <li><b>La semana como tabla de menú</b><span>En el teléfono se planifica por semana (comidas × días); el mes queda como vista secundaria.</span></li>
+      <li><b>Nutrición visible</b><span>Si las recetas traen kcal, proteína, hierro y calcio, el día muestra cuánto cubres de tus metas.</span></li>
+      <li><b>Cocinar a pantalla completa</b><span>Modo oscuro, paso gigante, temporizador del paso en el centro y deslizar para avanzar.</span></li>
+    </ul>
+  </header>
+
+  <div class="row">
+    <!-- HOY -->
+    <section class="shot">
+      <h2>Hoy</h2>
+      <div class="phone"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="hello"><div><small>Miércoles 18 de noviembre</small><h3>Buenos días</h3></div><div class="avatar"><svg class="ic"><use href="#i-timer"/></svg></div></div>
+        <div class="next c-des"><div class="plate c-des">🥣</div>
+          <div class="when">23 min<small>para el desayuno</small></div>
+          <h4>Avena cremosa con frutas</h4><p>13 min · empieza a las 07:47</p>
+          <div class="go"><span class="b ink"><svg class="ic f"><use href="#i-play"/></svg>Cocinar</span><span class="b gh">Ver receta</span></div></div>
+        <div class="nutri"><div class="rings"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="33" stroke="#E9EDE5"/><circle cx="38" cy="38" r="33" stroke="#1F5C43" pathLength="100" stroke-dasharray="62 100"/><circle cx="38" cy="38" r="23" stroke="#E9EDE5"/><circle cx="38" cy="38" r="23" stroke="#D9472F" pathLength="100" stroke-dasharray="48 100"/><circle cx="38" cy="38" r="13" stroke="#E9EDE5"/><circle cx="38" cy="38" r="13" stroke="#E9A93A" pathLength="100" stroke-dasharray="80 100"/></svg></div>
+          <div><h5>Lo planificado cubre <span class="new">nuevo</span></h5><div class="bars">
+            <div class="bar"><span>Energía</span><i><b style="width:62%;background:var(--brand)"></b></i><span>1340/2100</span></div>
+            <div class="bar"><span>Hierro</span><i><b style="width:48%;background:var(--tomato)"></b></i><span>8,6/18 mg</span></div>
+            <div class="bar"><span>Proteína</span><i><b style="width:80%;background:var(--saffron)"></b></i><span>52/65 g</span></div></div></div></div>
+        <div class="tl"><h5>Tu día</h5>
+          <div class="ti c-des"><time>08:00</time><div class="card"><div class="plate c-des" style="--s:38px">🥣</div><div><b>Avena cremosa</b><span>2 porc. · 13 min</span></div></div></div>
+          <div class="now"><span>09:41</span><i></i></div>
+          <div class="ti c-alm"><time>13:30</time><div class="card"><div class="plate c-alm" style="--s:38px">🍲</div><div><b>Lentejas guisadas</b><span>Alto en hierro · 50 min</span></div></div></div>
+          <div class="ti c-mer"><time>17:00</time><div class="empty"><svg class="ic"><use href="#i-plus"/></svg>Merienda: elegir del recetario</div></div>
+        </div>
+      </div>
+      <nav class="tabbar"><span class="tab on"><span class="pill"><svg class="ic"><use href="#i-home"/></svg></span>Hoy</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cal"/></svg></span>Semana</span><span class="fab"><svg class="ic"><use href="#i-plus"/></svg></span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-book"/></svg></span>Recetario</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cart"/></svg></span>Compras</span></nav></div>
+      <ul class="chg"><li>El próximo platillo es un bloque del color de su comida con la cuenta regresiva en grande.</li><li>El día se lee como línea de tiempo, con una marca de «ahora».</li><li>Resumen nutricional del día frente a tus metas.</li></ul>
+    </section>
+
+    <!-- SEMANA -->
+    <section class="shot">
+      <h2>Semana</h2>
+      <div class="phone"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="top"><h3>16 al 22 nov</h3><div class="seg"><span class="on">Semana</span><span>Mes</span></div></div>
+        <div class="wkstrip"><div class="wk"><small>lun</small><b>16</b></div><div class="wk"><small>mar</small><b>17</b></div><div class="wk on"><small>mié</small><b>18</b></div><div class="wk"><small>jue</small><b>19</b></div><div class="wk"><small>vie</small><b>20</b></div><div class="wk"><small>sáb</small><b>21</b></div><div class="wk"><small>dom</small><b>22</b></div></div>
+        <div class="menu">
+          <span></span><span class="h">mié 18</span><span class="h">jue 19</span><span class="h">vie 20</span>
+          <span class="ml c-des"><i></i>Desay.</span><div class="cell"><div class="plate c-des">🥣</div>Avena</div><div class="cell"><div class="plate c-des">🍳</div>Huevos rancheros</div><div class="cell add">+</div>
+          <span class="ml c-alm"><i></i>Almuerzo</span><div class="cell"><div class="plate c-alm">🍲</div>Lentejas</div><div class="cell"><div class="plate c-alm">🍗</div>Arroz con pollo</div><div class="cell"><div class="plate c-alm">🍝</div>Pasta pomodoro</div>
+          <span class="ml c-mer"><i></i>Merienda</span><div class="cell add">+</div><div class="cell"><div class="plate c-mer">🥑</div>Guacamole</div><div class="cell add">+</div>
+          <span class="ml c-cen"><i></i>Cena</span><div class="cell"><div class="plate c-cen">🥗</div>Ensalada César</div><div class="cell"><div class="plate c-cen">🐟</div>Salmón al horno</div><div class="cell"><div class="plate c-cen">🌮</div>Tacos</div>
+        </div>
+        <div class="tip"><svg class="ic" style="width:28px;height:28px"><use href="#i-spark"/></svg><div><b>Completar la semana</b><span>Llena los huecos con tu recetario o con un prompt nutricional para tu IA.</span></div></div>
+        <p style="margin:12px 20px 0;font-size:.8rem;color:var(--muted)">Desliza a los lados para ver los demás días. Mantén pulsado un platillo para moverlo a otra casilla.</p>
+      </div>
+      <nav class="tabbar"><span class="tab"><span class="pill"><svg class="ic"><use href="#i-home"/></svg></span>Hoy</span><span class="tab on"><span class="pill"><svg class="ic"><use href="#i-cal"/></svg></span>Semana</span><span class="fab"><svg class="ic"><use href="#i-plus"/></svg></span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-book"/></svg></span>Recetario</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cart"/></svg></span>Compras</span></nav></div>
+      <ul class="chg"><li>Tabla de menú: comidas en filas, días en columnas, como un menú semanal pegado en la nevera.</li><li>Cada hueco vacío es un «+» directo al recetario.</li><li>Arrastrar para mover <span class="new">nuevo</span>.</li></ul>
+    </section>
+
+    <!-- RECETARIO -->
+    <section class="shot">
+      <h2>Recetario</h2>
+      <div class="phone"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="top"><h3>Recetario</h3><span class="b"><svg class="ic"><use href="#i-spark"/></svg>IA</span></div>
+        <div class="search"><svg class="ic"><use href="#i-search"/></svg>Busca receta o ingrediente</div>
+        <div class="chips"><span class="chip on">Todas</span><span class="chip"><svg class="ic f" style="width:14px;height:14px;color:var(--saffron)"><use href="#i-star"/></svg>Favoritas</span><span class="chip c-des"><i></i>Desayuno</span><span class="chip c-alm"><i></i>Almuerzo</span><span class="chip c-cen"><i></i>Cena</span></div>
+        <div class="tiles">
+          <div class="tile c-alm"><span class="kc">480 kcal</span><svg class="ic f star"><use href="#i-star"/></svg><div class="plate c-alm">🍲</div><b>Lentejas guisadas</b><div class="m"><span>50 min</span><span>Fácil</span><span>Hierro</span></div></div>
+          <div class="tile c-des"><span class="kc">390 kcal</span><div class="plate c-des">🥣</div><b>Avena cremosa con frutas</b><div class="m"><span>13 min</span><span>Fácil</span></div></div>
+          <div class="tile c-cen"><span class="kc">520 kcal</span><div class="plate c-cen">🐟</div><b>Salmón al horno</b><div class="m"><span>30 min</span><span>Omega-3</span></div></div>
+          <div class="tile c-pos"><span class="kc">310 kcal</span><div class="plate c-pos">🍫</div><b>Brownies</b><div class="m"><span>40 min</span><span>Media</span></div></div>
+        </div>
+      </div>
+      <nav class="tabbar"><span class="tab"><span class="pill"><svg class="ic"><use href="#i-home"/></svg></span>Hoy</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cal"/></svg></span>Semana</span><span class="fab"><svg class="ic"><use href="#i-plus"/></svg></span><span class="tab on"><span class="pill"><svg class="ic"><use href="#i-book"/></svg></span>Recetario</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cart"/></svg></span>Compras</span></nav></div>
+      <ul class="chg"><li>Fichas en dos columnas con el plato grande sobre un fondo suave de su color.</li><li>Calorías y nutriente destacado en la ficha <span class="new">nuevo</span>.</li><li>Mantener pulsado = seleccionar varias (organizar en lote).</li></ul>
+    </section>
+
+    <!-- DETALLE -->
+    <section class="shot">
+      <h2>Receta</h2>
+      <div class="phone"><div class="sb" style="background:var(--m-alm);color:#fff"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="hero"><div class="nav"><span><svg class="ic"><use href="#i-left"/></svg></span><span><svg class="ic"><use href="#i-dots"/></svg></span></div>
+          <div class="plate">🍲</div><small>Almuerzo</small><h3>Lentejas guisadas</h3>
+          <div class="facts"><div><b>50 min</b><span>en total</span></div><div><b>Fácil</b><span>dificultad</span></div><div><b>480</b><span>kcal/porc.</span></div><div><b>7 mg</b><span>hierro</span></div></div></div>
+        <div class="tabs"><span class="on">Ingredientes</span><span>Pasos</span><span>Nutrición</span></div>
+        <div class="serv"><span>Para</span><div class="stp"><span>−</span><b>4 porciones</b><span>+</span></div></div>
+        <ul class="ings"><li><span>Lentejas</span><b>300 g</b></li><li><span>Zanahoria</span><b>2 piezas</b></li><li><span>Papa</span><b>2 piezas</b></li><li><span>Cebolla</span><b>1 pieza</b></li><li><span>Tomate</span><b>2 piezas</b></li></ul>
+        <div class="actbar"><span class="b"><svg class="ic"><use href="#i-cal"/></svg>Añadir a un día</span><span class="b p"><svg class="ic f"><use href="#i-play"/></svg>Cocinar</span></div>
+      </div></div>
+      <ul class="chg"><li>Cabecera a sangre del color de la comida, con los datos clave.</li><li>Pestañas Ingredientes, Pasos y Nutrición en vez de una página larga.</li><li>Acciones fijas abajo, al alcance del pulgar.</li></ul>
+    </section>
+
+    <!-- COCINAR -->
+    <section class="shot">
+      <h2>Cocinar</h2>
+      <div class="phone dark"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="ck-top"><svg class="ic"><use href="#i-x"/></svg><span>Lentejas guisadas</span><span>4 porc.</span></div>
+        <div class="ck-prog"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="n"></i><i></i></div>
+        <div class="ck-step"><small>Paso 5 de 6</small><p>Cocina a fuego medio-bajo hasta que las lentejas estén tiernas.</p></div>
+        <div class="ck-ing"><span>300 g lentejas</span><span>2 zanahorias</span><span>2 papas</span></div>
+        <div class="ck-timer"><svg viewBox="0 0 210 210"><circle cx="105" cy="105" r="96" stroke="#22322A"/><circle cx="105" cy="105" r="96" stroke="#7FD1A3" pathLength="100" stroke-dasharray="58 100"/></svg><div><b>17:24</b><span>de 30:00</span></div></div>
+        <div class="ck-ctrl"><span>+1:00</span><span class="p">Pausa</span></div>
+        <div class="ck-nav"><span>Atrás</span><span class="p">Siguiente paso</span></div>
+      </div></div>
+      <ul class="chg"><li>Pantalla oscura que no deslumbra en la cocina, y la pantalla no se apaga.</li><li>Solo los ingredientes de este paso.</li><li>El temporizador vive dentro del paso; con la app cerrada suena una alarma de Android.</li></ul>
+    </section>
+
+    <!-- COMPRAS -->
+    <section class="shot">
+      <h2>Compras</h2>
+      <div class="phone"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="shop-h"><small>Lista de compras</small><div class="top" style="padding:0"><h3>Semana del 16 nov</h3><span class="b"><svg class="ic"><use href="#i-share"/></svg></span></div>
+          <div class="prog"><i><b></b></i><span>12/31</span></div></div>
+        <div class="aisles"><span class="chip on">Todo</span><span class="chip">Verdulería</span><span class="chip">Carnes</span><span class="chip">Lácteos</span><span class="chip">Despensa</span></div>
+        <div class="sec"><h5>Frutas y verduras <span>6 pendientes</span></h5>
+          <div class="it"><span class="cb"></span><span class="t">Zanahoria<small>Lentejas, Salmón</small></span><span class="q">4 pzas</span></div>
+          <div class="swipe-wrap"><div class="it"><span class="cb"></span><span class="t">Tomate<small>Huevos rancheros</small></span><span class="q">5 pzas</span></div></div>
+          <div class="it ok"><span class="cb"><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg></span><span class="t">Cebolla<small>4 recetas</small></span><span class="q">3 pzas</span></div></div>
+        <div class="sec"><h5>Carnes y pescados <span>2 pendientes</span></h5>
+          <div class="it"><span class="cb"></span><span class="t">Salmón<small>Salmón al horno</small></span><span class="q">2 filetes</span></div>
+          <div class="it"><span class="cb"></span><span class="t">Muslos de pollo<small>Arroz con pollo</small></span><span class="q">800 g</span></div></div>
+      </div>
+      <nav class="tabbar"><span class="tab"><span class="pill"><svg class="ic"><use href="#i-home"/></svg></span>Hoy</span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-cal"/></svg></span>Semana</span><span class="fab"><svg class="ic"><use href="#i-plus"/></svg></span><span class="tab"><span class="pill"><svg class="ic"><use href="#i-book"/></svg></span>Recetario</span><span class="tab on"><span class="pill"><svg class="ic"><use href="#i-cart"/></svg></span>Compras</span></nav></div>
+      <ul class="chg"><li>Cantidades alineadas a la derecha, fáciles de leer en el súper.</li><li>Pasillos como filtros arriba.</li><li>Deslizar un artículo para marcarlo comprado <span class="new">nuevo</span>.</li></ul>
+    </section>
+
+    <!-- HOJA RÁPIDA -->
+    <section class="shot">
+      <h2>Botón «+»</h2>
+      <div class="phone"><div class="sb"><span>9:41</span><span>●●● 100%</span></div><div class="scr">
+        <div class="hello"><div><small>Miércoles 18 de noviembre</small><h3>Buenos días</h3></div></div>
+        <div class="next c-des" style="opacity:.9"><div class="plate c-des">🥣</div><div class="when">23 min<small>para el desayuno</small></div><h4>Avena cremosa con frutas</h4></div>
+        <div class="scrim"></div>
+        <div class="sheet"><div class="grab"></div><h4>Añadir</h4>
+          <div class="qa">
+            <div><svg class="ic"><use href="#i-cal"/></svg><b>Platillo a un día</b><span>Desde tu recetario</span></div>
+            <div><svg class="ic"><use href="#i-book"/></svg><b>Nueva receta</b><span>Desde cero o con IA</span></div>
+            <div><svg class="ic"><use href="#i-timer"/></svg><b>Temporizador</b><span>1, 5, 10 min o a medida</span></div>
+            <div><svg class="ic"><use href="#i-list"/></svg><b>A la lista</b><span>Artículo de compras</span></div>
+          </div></div>
+      </div></div>
+      <ul class="chg"><li>Todo lo que se crea, desde un solo lugar.</li><li>En PC, lo mismo con el atajo <b>N</b>.</li></ul>
+    </section>
+  </div>
+
+  <section class="desk-wrap">
+    <h2>PC: semana con panel del día</h2>
+    <p class="only">La vista de escritorio se muestra en pantallas anchas.</p>
+    <div class="desk">
+      <aside class="side"><div class="brand"><i></i>Planner</div>
+        <span><svg class="ic"><use href="#i-home"/></svg>Hoy</span><span class="on"><svg class="ic"><use href="#i-cal"/></svg>Semana</span><span><svg class="ic"><use href="#i-book"/></svg>Recetario</span><span><svg class="ic"><use href="#i-cart"/></svg>Compras</span>
+        <span class="new-b"><svg class="ic"><use href="#i-plus"/></svg>Añadir</span></aside>
+      <div class="dmain"><div style="display:flex;justify-content:space-between;align-items:center"><h3>16 al 22 de noviembre</h3><div class="seg"><span class="on">Semana</span><span>Mes</span></div></div>
+        <div class="dgrid">
+          <span></span><span class="h">lun 16</span><span class="h">mar 17</span><span class="h on"><b>mié 18</b></span><span class="h">jue 19</span><span class="h">vie 20</span><span class="h">sáb 21</span><span class="h">dom 22</span>
+          <span style="display:flex;align-items:center;gap:6px;font-weight:700;color:var(--muted)"><i style="width:9px;height:9px;border-radius:3px;background:var(--m-des);transform:rotate(45deg)"></i>Desayuno</span>
+          <div class="cell"><div class="plate c-des" style="--s:36px">🥞</div>Panqueques</div><div class="cell"><div class="plate c-des" style="--s:36px">🥣</div>Avena</div><div class="cell sel"><div class="plate c-des" style="--s:36px">🥣</div>Avena</div><div class="cell"><div class="plate c-des" style="--s:36px">🍳</div>Huevos</div><div class="cell add">+</div><div class="cell add">+</div><div class="cell"><div class="plate c-des" style="--s:36px">🥞</div>Panqueques</div>
+          <span style="display:flex;align-items:center;gap:6px;font-weight:700;color:var(--muted)"><i style="width:9px;height:9px;border-radius:3px;background:var(--m-alm);transform:rotate(45deg)"></i>Almuerzo</span>
+          <div class="cell"><div class="plate c-alm" style="--s:36px">🍗</div>Arroz con pollo</div><div class="cell"><div class="plate c-alm" style="--s:36px">🍝</div>Pasta</div><div class="cell"><div class="plate c-alm" style="--s:36px">🍲</div>Lentejas</div><div class="cell"><div class="plate c-alm" style="--s:36px">🍗</div>Arroz con pollo</div><div class="cell"><div class="plate c-alm" style="--s:36px">🍝</div>Pasta</div><div class="cell add">+</div><div class="cell add">+</div>
+          <span style="display:flex;align-items:center;gap:6px;font-weight:700;color:var(--muted)"><i style="width:9px;height:9px;border-radius:3px;background:var(--m-cen);transform:rotate(45deg)"></i>Cena</span>
+          <div class="cell"><div class="plate c-cen" style="--s:36px">🌮</div>Tacos</div><div class="cell"><div class="plate c-cen" style="--s:36px">🎃</div>Crema</div><div class="cell"><div class="plate c-cen" style="--s:36px">🥗</div>César</div><div class="cell"><div class="plate c-cen" style="--s:36px">🐟</div>Salmón</div><div class="cell"><div class="plate c-cen" style="--s:36px">🌮</div>Tacos</div><div class="cell add">+</div><div class="cell add">+</div>
+        </div></div>
+      <aside class="dpanel"><small style="color:var(--muted)">Miércoles 18</small><h4>Hoy</h4>
+        <div class="tl" style="margin:14px 0 0">
+          <div class="ti c-des"><time>08:00</time><div class="card"><div class="plate c-des" style="--s:34px">🥣</div><div><b>Avena cremosa</b><span>390 kcal</span></div></div></div>
+          <div class="ti c-alm"><time>13:30</time><div class="card"><div class="plate c-alm" style="--s:34px">🍲</div><div><b>Lentejas guisadas</b><span>480 kcal · 7 mg hierro</span></div></div></div>
+          <div class="ti c-cen"><time>20:30</time><div class="card"><div class="plate c-cen" style="--s:34px">🥗</div><div><b>Ensalada César</b><span>470 kcal</span></div></div></div></div>
+        <div class="bars" style="margin-top:16px"><div class="bar"><span>Energía</span><i><b style="width:64%;background:var(--brand)"></b></i><span>1340</span></div><div class="bar"><span>Hierro</span><i><b style="width:48%;background:var(--tomato)"></b></i><span>8,6 mg</span></div><div class="bar"><span>Calcio</span><i><b style="width:55%;background:var(--m-cen)"></b></i><span>550 mg</span></div></div>
+      </aside>
+    </div>
+  </section>
+</div>
+</body>
+</html>

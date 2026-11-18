@@ -1,13 +1,42 @@
 # Planner de Recetas
 
-Mini app (PWA) para planificar las comidas del mes: recetas, plan por día con hora, lista de compras y modo cocinar con temporizadores. Sin servidor ni cuentas: los datos viven en el dispositivo.
+App para planificar las comidas del mes: recetario, calendario por comidas, listas de compras, modo cocinar con temporizadores y prompts para IA (incluido un prompt nutricional).
 
-## Usar
-- **PC:** abre `index.html` desde un servidor estático (`python3 -m http.server`) y visita `http://localhost:8000`, o publícalo en cualquier hosting estático (GitHub Pages, Netlify, Render static…).
-- **Android:** abre la URL publicada en Chrome → menú ⋮ → *Instalar app* / *Añadir a pantalla de inicio*. Funciona sin conexión.
+Un solo código web (`www/`) que se usa de tres formas:
 
-## IA
-En **Datos → Importar JSON de IA** copia el prompt, pídele a tu IA las recetas (y opcionalmente el plan del mes) y pega la respuesta. Formato en `docs/superpowers/specs/2026-11-17-planner-design.md`.
+| Plataforma | Cómo | Notas |
+|---|---|---|
+| **Android** | App nativa con [Capacitor](https://capacitorjs.com) (`android/`) | Alarmas del temporizador aunque la app esté cerrada, pantalla encendida al cocinar, compartir y guardar respaldos, botón atrás. |
+| **PC (Windows/Mac/Linux)** | PWA instalable desde Edge o Chrome | Ventana propia, icono en el menú Inicio, funciona sin internet. |
+| **Navegador** | `www/` en cualquier hosting estático | Igual que la PWA. |
 
-## Pasar datos entre dispositivos
-**Datos → Exportar respaldo** y **Importar respaldo** en el otro dispositivo. (La sincronización en la nube es la siguiente fase; la persistencia está aislada en `Store` dentro de `app.js`.)
+## Estructura
+- `www/` código de la app (HTML, CSS, JS sin dependencias, fuentes locales).
+- `android/` proyecto Android generado por Capacitor (iconos, permisos, splash).
+- `capacitor.config.json` configuración de la app nativa.
+- `scripts/copy-fonts.mjs` copia las tipografías a `www/fonts`.
+- `docs/` diseño y mockups.
+
+## Probar en el navegador
+```bash
+npm install
+npm run serve   # http://localhost:8123
+```
+
+## Compilar el APK en tu PC (sin GitHub Actions)
+Requisitos: Node 20+, JDK 21 y el SDK de Android (lo trae Android Studio; con línea de comandos: plataforma 36 y build-tools 36).
+
+```bash
+npm install
+npm run apk
+```
+El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`. Pásalo al teléfono e instálalo (Android pedirá permitir «instalar apps de origen desconocido»).
+
+Con Android Studio: `npm run sync`, luego abre la carpeta `android/` y pulsa *Run* con el teléfono conectado por USB.
+
+## Instalar en PC
+1. Publica `www/` (o ejecútalo con `npm run serve`).
+2. Ábrelo en Edge o Chrome y pulsa el icono **Instalar** de la barra de direcciones.
+
+## Datos
+Todo se guarda en el dispositivo. Para pasar datos entre el teléfono y el PC: *Más → Exportar respaldo* y *Importar respaldo*. La sincronización en la nube es la siguiente fase (la persistencia está aislada en `Store` dentro de `www/app.js`).
