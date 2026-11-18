@@ -11,7 +11,7 @@ Un solo código web (`www/`) que se usa de tres formas:
 | **Navegador** | `www/` en cualquier hosting estático | Igual que la PWA. |
 
 ## Estructura
-- `www/` código de la app (HTML, CSS, JS sin dependencias, fuentes locales).
+- `www/` código de la app: `index.html`, `style.css` y módulos en `www/js/` (núcleo, compras, temporizadores, vistas, diálogos, acciones). Sin dependencias ni bundler; fuentes locales.
 - `android/` proyecto Android generado por Capacitor (iconos, permisos, splash).
 - `capacitor.config.json` configuración de la app nativa.
 - `scripts/copy-fonts.mjs` copia las tipografías a `www/fonts`.
@@ -24,7 +24,7 @@ npm run serve   # http://localhost:8123
 ```
 
 ## Compilar el APK en tu PC (sin GitHub Actions)
-Requisitos: Node 20+, JDK 21 y el SDK de Android (lo trae Android Studio; con línea de comandos: plataforma 36 y build-tools 36).
+Requisitos: Node 20+, JDK 21 y el SDK de Android (lo trae Android Studio; por línea de comandos: `platforms;android-36`, `build-tools;36.0.0` y `platform-tools`). Crea `android/local.properties` con `sdk.dir=/ruta/al/sdk` si no usas Android Studio.
 
 ```bash
 npm install

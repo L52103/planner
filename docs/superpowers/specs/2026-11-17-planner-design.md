@@ -46,3 +46,12 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - "Priorizar mi nutrición" genera un prompt con secciones (perfil, metas diarias de referencia: energía, proteína, fibra, hierro + vitamina C, calcio, vitamina D, folato, B12, magnesio, zinc, omega-3, variedad, hidratación), recetas del recetario y formato JSON.
 - "Permitir recetas nuevas": la IA puede añadir recetas equilibradas (con aporte aproximado en notas); al importar se agregan al recetario y al plan.
 - Valores orientativos; la app aclara que no sustituyen a un nutricionista.
+
+## Versión 4 (app Android + rediseño según el mockup)
+- Arquitectura: código web en `www/` (módulos `js/core, shop, timers, views, dialogs, actions`) envuelto con Capacitor 8 para Android; en PC se instala como PWA. Sin GitHub Actions: el APK se compila en local (`npm run apk`).
+- Navegación: Hoy · Semana · [+] · Recetario · Compras (botón central de añadir rápido; atajo N en PC). «Más» desde el engranaje.
+- Hoy: próximo platillo en bloque de color con cuenta regresiva, resumen nutricional del día y línea de tiempo con marca de «ahora».
+- Semana: tabla de menú (comidas × días), mover platillos con pulsación larga o arrastrando en PC; Mes como vista secundaria.
+- Recetas con `nutrition` por porción (kcal, protein, carbs, fat, fiber, iron, calcium); metas diarias desde el perfil; ejemplos con datos aproximados y migración automática.
+- Cocinar: pantalla completa oscura, anillo del temporizador dentro del paso, ingredientes del paso, deslizar o flechas para avanzar.
+- Compras: filtros por pasillo, cantidades alineadas, deslizar para marcar comprado.
