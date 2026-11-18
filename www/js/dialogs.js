@@ -6,7 +6,7 @@ function openDlg(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); }
 function closeDlg() { if (dlg.open) dlg.close(); }
 dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
 // Al cerrar se limpia el estado del diálogo (salvo que otro se haya abierto enseguida)
-dlg.addEventListener('close', () => { if (dlg.open) return; ui.pick = null; ui.pd = null; ui.nl = null; ui.org = null; ui.sheet = null; });
+dlg.addEventListener('close', () => { if (dlg.open) return; ui.pick = null; ui.pd = null; ui.nl = null; ui.org = null; ui.sheet = null; ui.na = null; });
 const dlgHead = (title, sub = '', lead = '') => `<div class="dlg-h">${lead}<div>${sub ? `<p class="muted">${sub}</p>` : ''}<h2>${title}</h2></div><button class="btn icon ghost" data-act="closeDlg" aria-label="Cerrar">${ic('x')}</button></div>`;
 
 function dayChips(selected, act, extra = '') {
@@ -386,6 +386,60 @@ function renderOrgKeep() {
   dlg.scrollTop = top;
 }
 const snapshotPlan = label => { ui.undo = { plan: JSON.stringify(S.plan), label }; };
+
+/* ───────── Estimar nutrientes con IA ───────── */
+function nutriScopeRecipes(n) {
+  const dayRec = [...new Map((S.plan[n.date] || []).map(i => getRecipe(i.recipeId)).filter(Boolean).map(r => [r.id, r])).values()];
+  if (n.scope === 'book') return S.recipes.filter(r => !hasNutr(r));
+  if (n.scope === 'missing') return dayRec.filter(r => !hasNutr(r));
+  return dayRec;
+}
+function nutriPrompt(n) {
+  const p = profile(), g = dailyGoals(p), list = nutriScopeRecipes(n), day = n.scope !== 'book';
+  const items = (S.plan[n.date] || []).slice().sort((a, b) => a.time.localeCompare(b.time));
+  const out = [`Actúa como nutricionista. Estima los nutrientes POR PORCIÓN de estas recetas a partir de sus ingredientes y del número de porciones que rinden. Valores aproximados y realistas.`];
+  out.push(`## Recetas\n` + list.map((r, k) => `${k + 1}. ${r.name} (rinde ${r.servings} ${r.servings === 1 ? 'porción' : 'porciones'})\n   Ingredientes: ${r.ingredients.map(i => `${i.qty ? fmtQty(i.qty) + (i.unit ? ' ' + i.unit : '') + ' ' : ''}${i.name}`).join(', ') || 'no indicados'}`).join('\n'));
+  if (day) {
+    out.push(`## Contexto del día (${longDate(n.date)})\nEsto es lo que comeré ese día, una porción de cada platillo:\n${items.map(i => `- ${CATS[i.meal].name} ${i.time}: ${getRecipe(i.recipeId)?.name}`).join('\n')}\n\nMi perfil: ${p.sex === 'mujer' ? 'mujer' : 'hombre'} de ${p.age} años, actividad ${p.activity}; objetivo: ${GOALS[p.goal].toLowerCase()}.\nMeta diaria aproximada: ${g.kcal} kcal, ${g.protein} g de proteína, ${g.fiber} g de fibra, ${g.iron} mg de hierro y ${g.calcium} mg de calcio.${String(p.restrictions).trim() ? `\nRestricciones: ${p.restrictions}.` : ''}`);
+  }
+  out.push(`## Formato de respuesta\nResponde ÚNICAMENTE con un JSON válido, sin texto antes ni después:\n{\n  "recipes": [\n    { "name": "Nombre exacto de la receta", ${NUTR_JSON} }\n  ]${day ? ',\n  "dayTip": "Una o dos frases: cuánto cubre el día de la meta, qué falta y qué añadir o cambiar"' : ''}\n}\n\nReglas:\n- "name" debe ser exactamente el nombre de la lista.\n- protein, carbs, fat y fiber en gramos; iron y calcium en miligramos; solo números, sin unidades.${day ? '\n- "dayTip" corto, práctico y en español.' : ''}`);
+  return out.join('\n\n');
+}
+function nutriAiDlg(date, scope) {
+  const missing = (S.plan[date] || []).some(i => { const r = getRecipe(i.recipeId); return r && !hasNutr(r); });
+  ui.na = { date, scope: scope || (missing ? 'missing' : 'day') };
+  renderNutriAi();
+}
+function renderNutriAi() {
+  const n = ui.na, list = nutriScopeRecipes(n);
+  const scopes = n.scope === 'book' ? [['book', 'Recetario sin datos']] : [['missing', 'Platillos sin datos'], ['day', 'Todo el día']];
+  openDlg(`${dlgHead('Estimar nutrientes con IA', n.scope === 'book' ? 'Recetario' : esc(longDate(n.date)))}
+  <ol class="howto"><li>Copia el prompt: incluye los ingredientes y porciones${n.scope === 'book' ? '' : ', tu perfil y tu meta del día'}.</li><li>Pégalo en tu IA (ChatGPT, Claude, Gemini…).</li><li>Pega aquí su respuesta y aplica los datos.</li></ol>
+  ${scopes.length > 1 ? `<div class="seg" role="group">${scopes.map(([k, v]) => `<button class="${n.scope === k ? 'on' : ''}" data-act="naScope" data-s="${k}" aria-pressed="${n.scope === k}">${v}</button>`).join('')}</div>` : ''}
+  <p class="preview">${list.length ? `${list.length} ${list.length === 1 ? 'receta' : 'recetas'}: ${esc(list.slice(0, 6).map(r => r.name).join(', '))}${list.length > 6 ? '…' : ''}` : 'No hay recetas en este grupo: todas tienen datos. Elige «Todo el día» para revisarlas y recibir una sugerencia.'}</p>
+  <div class="row" style="margin-top:12px"><button class="btn primary" data-act="naCopy" ${list.length ? '' : 'disabled'}>${ic('copy')}Copiar prompt</button><button class="btn ghost" data-act="naToggle">${n.show ? 'Ocultar prompt' : 'Ver prompt'}</button></div>
+  ${n.show ? `<pre class="prompt big">${esc(nutriPrompt(n))}</pre>` : ''}
+  <label for="na-text">Respuesta de la IA (JSON)</label><textarea id="na-text" placeholder='{"recipes": [{"name": "…", "nutrition": {"kcal": 450, …}}]}' style="min-height:140px"></textarea>
+  <p id="na-msg" class="err" role="alert"></p>
+  <div class="dlg-f"><button class="btn" data-act="closeDlg">Cancelar</button><button class="btn primary" data-act="naApply">${ic('check')}Aplicar datos</button></div>`);
+}
+function applyNutriAI(text, n) {
+  if (!String(text).trim()) throw new Error('Pega primero la respuesta de la IA.');
+  let data;
+  try { data = JSON.parse(extractJSON(text)); } catch (e) { throw new Error('El JSON no es válido (' + e.message + '). Pide a la IA que responda solo con el JSON.'); }
+  const rows = Array.isArray(data) ? data : Array.isArray(data.recipes ?? data.recetas) ? (data.recipes ?? data.recetas) : [];
+  let updated = 0; const unknown = [];
+  for (const row of rows) {
+    const r = S.recipes.find(x => fold(x.name) === fold(row?.name ?? row?.nombre ?? ''));
+    const nu = cleanNutrition(row?.nutrition ?? row?.nutricion ?? row);
+    if (!r || !nu) { unknown.push(row?.name ?? '?'); continue; }
+    r.nutrition = nu; updated++;
+  }
+  const tip = !Array.isArray(data) && (data.dayTip ?? data.consejo ?? data.sugerencia);
+  if (tip && n.scope !== 'book') S.dayTips[n.date] = String(tip).trim().slice(0, 600);
+  if (!updated && !tip) throw new Error(rows.length ? `Ningún nombre coincide con tus recetas (${unknown.slice(0, 3).join(', ')}). Revisa que sean exactos.` : 'El JSON no trae "recipes".');
+  return { updated, unknown, tip: !!tip };
+}
 
 /* ───────── Nueva lista de compras ───────── */
 function newListDlg(opts = {}) {

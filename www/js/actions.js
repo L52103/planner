@@ -136,6 +136,19 @@ const A = {
   dropCell: d => { if (ui.moving) moveItem(ui.moving.date, ui.moving.id, d.date, d.meal); },
   shopDay: d => newListDlg({ name: `Compras de ${relDay(d.date).toLowerCase()}`, from: d.date, to: d.date, preset: '' }),
 
+  /* nutrición con IA */
+  nutriAi: d => nutriAiDlg(d.date, d.scope),
+  naScope: d => { ui.na.scope = d.s; renderNutriAi(); },
+  naToggle: () => { const t = $('#na-text').value; ui.na.show = !ui.na.show; renderNutriAi(); $('#na-text').value = t; },
+  naCopy: () => copyText(nutriPrompt(ui.na), 'Prompt copiado. Pégalo en tu IA.'),
+  naApply: async () => {
+    try {
+      const res = applyNutriAI($('#na-text').value, ui.na);
+      await save(); closeDlg(); render();
+      toast(`${res.updated ? `Datos aplicados a ${res.updated} ${res.updated === 1 ? 'receta' : 'recetas'}` : 'Sugerencia guardada'}${res.unknown.length ? `, ${res.unknown.length} sin coincidencia` : ''}`);
+    } catch (e) { $('#na-msg').textContent = e.message; }
+  },
+
   /* organizar días */
   orgDlg,
   orgMode: d => { ui.org.mode = d.mode; if (d.mode === 'auto') orgRefresh(); else renderOrg(); },

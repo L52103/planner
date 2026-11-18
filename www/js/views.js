@@ -54,21 +54,31 @@ function rings(vals) {
   return `<svg viewBox="0 0 76 76" aria-hidden="true">${vals.map((v, i) => `<circle cx="38" cy="38" r="${R[i]}" class="rg-trk"/><circle cx="38" cy="38" r="${R[i]}" class="rg-${i}" pathLength="100" stroke-dasharray="${Math.max(0.1, Math.min(100, v))} 100"/>`).join('')}</svg>`;
 }
 function nutriCard(date) {
-  const items = S.plan[date] || [];
-  if (!items.length) return '';
-  const { tot, withData, without } = dayNutrition(date), g = dailyGoals();
+  const items = (S.plan[date] || []).filter(i => getRecipe(i.recipeId)), g = dailyGoals();
+  if (!items.length) {
+    return `<section class="nutri none">${ic('leaf')}<div><b>Tu meta para este día</b><p>${fmtNum(g.kcal)} kcal, ${g.protein} g de proteína, ${g.iron} mg de hierro y ${fmtNum(g.calcium)} mg de calcio. Añade platillos y verás cuánto cubren.</p></div></section>`;
+  }
+  const { tot, withData, without } = dayNutrition(date), tip = S.dayTips[date];
+  const aiBtn = `<button class="btn sm" data-act="nutriAi" data-date="${date}">${ic('spark')}${without ? 'Estimar con IA' : 'Revisar con IA'}</button>`;
+  const tipHtml = tip ? `<p class="ntip">${ic('spark')}<span>${esc(tip)}</span></p>` : '';
   if (!withData) {
-    return `<section class="nutri none">${ic('leaf')}<div><b>Sin datos nutricionales</b><p>Los platillos de este día no tienen calorías ni nutrientes. Añádelos al editar la receta o pídeselos a la IA.</p></div></section>`;
+    return `<section class="nutri none">${ic('leaf')}<div><b>Sin datos nutricionales</b><p>Pide a la IA un estimado de los ${items.length === 1 ? 'platillo' : `${items.length} platillos`} de este día y verás cuánto cubren de tu meta.</p>${tipHtml}${aiBtn}</div></section>`;
   }
   const pct = k => Math.round((tot[k] / g[k]) * 100);
   const bar = (k, label, unit, cls) => `<div class="nbar"><span>${label}</span><i><b class="${cls}" style="width:${Math.min(100, pct(k))}%"></b></i><span>${fmtNum(tot[k], k === 'iron' ? 1 : 0)}/${fmtNum(g[k])} ${unit}</span></div>`;
+  const dishes = items.slice().sort((x, y) => x.time.localeCompare(y.time)).map(it => {
+    const r = getRecipe(it.recipeId), n = r.nutrition;
+    return `<li><i class="pip c-${it.meal}"></i><span>${esc(r.name)}</span><b>${hasNutr(r) ? `${fmtNum(n.kcal)} kcal${n.protein ? `, ${fmtNum(n.protein)} g prot.` : ''}` : '<em>sin datos</em>'}</b></li>`;
+  }).join('');
   return `<section class="nutri">
     <div class="rings">${rings([pct('kcal'), pct('protein'), pct('iron')])}</div>
     <div class="nutri-b"><h3>Lo planificado cubre</h3>
       ${bar('kcal', 'Energía', 'kcal', 'rg-0')}${bar('protein', 'Proteína', 'g', 'rg-1')}${bar('iron', 'Hierro', 'mg', 'rg-2')}
-      <details class="nmore"><summary>Fibra y calcio</summary>${bar('fiber', 'Fibra', 'g', 'rg-f')}${bar('calcium', 'Calcio', 'mg', 'rg-c')}</details>
-      ${without ? `<p class="muted small">${without} ${without === 1 ? 'platillo sin datos' : 'platillos sin datos'}; no cuentan en la suma.</p>` : ''}
-    </div></section>`;
+      <details class="nmore"><summary>Fibra, calcio y detalle por platillo</summary>${bar('fiber', 'Fibra', 'g', 'rg-f')}${bar('calcium', 'Calcio', 'mg', 'rg-c')}<ul class="ndish">${dishes}</ul></details>
+    </div>
+    ${tipHtml ? `<div class="nutri-tip">${tipHtml}</div>` : ''}
+    <div class="nutri-f">${without ? `<span class="muted small">${without} ${without === 1 ? 'platillo sin datos' : 'platillos sin datos'}, no cuentan en la suma</span>` : '<span class="muted small">Una porción de cada platillo, valores aproximados</span>'}${aiBtn}</div>
+  </section>`;
 }
 
 /* ───────── Hoy ───────── */
@@ -496,6 +506,7 @@ function viewMore() {
     <section class="panel span2"><h2>${ic('user')}Perfil nutricional</h2><p class="muted">Define tus metas diarias: ${fmtNum(g.kcal)} kcal, ${g.protein} g de proteína, ${g.iron} mg de hierro y ${g.calcium} mg de calcio. Se usan en el resumen de cada día y en el prompt para la IA.</p>${profileFields(false)}</section>
     <section class="panel"><h2>${ic('spark')}Recetas con IA</h2><p>Copia el prompt, pégalo en tu IA (ChatGPT, Claude, Gemini…) y describe lo que quieres. Luego pega aquí su respuesta.</p>
       <div class="row"><button class="btn primary" data-act="importDlg">Importar respuesta</button><button class="btn" data-act="copyPrompt">${ic('copy')}Copiar prompt</button></div></section>
+    <section class="panel"><h2>${ic('leaf')}Nutrición con IA</h2><p>Pide a tu IA un estimado de calorías y nutrientes de las recetas que aún no los tienen (${S.recipes.filter(r => !hasNutr(r)).length} ahora).</p><button class="btn" data-act="nutriAi" data-date="${todayStr()}" data-scope="book">${ic('spark')}Estimar recetario</button></section>
     <section class="panel"><h2>${ic('cal')}Organizar el mes</h2><p>Llena tus días con el recetario o con un prompt nutricional para tu IA.</p><button class="btn" data-act="orgDlg">${ic('spark')}Abrir</button></section>
     <section class="panel"><h2>${ic('down')}Respaldo</h2><p>Todo se guarda en este dispositivo. Exporta un respaldo para guardarlo o pasarlo a tu otro dispositivo.</p>
       <div class="row"><button class="btn primary" data-act="exportAll">${ic('down')}Exportar</button><button class="btn" data-act="pickBackup">${ic('up')}Importar</button><button class="btn ghost" data-act="exportRecipes">Solo recetas</button></div>

@@ -55,3 +55,8 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - Recetas con `nutrition` por porción (kcal, protein, carbs, fat, fiber, iron, calcium); metas diarias desde el perfil; ejemplos con datos aproximados y migración automática.
 - Cocinar: pantalla completa oscura, anillo del temporizador dentro del paso, ingredientes del paso, deslizar o flechas para avanzar.
 - Compras: filtros por pasillo, cantidades alineadas, deslizar para marcar comprado.
+
+## Versión 4.1 (nutrición del día con IA)
+- La tarjeta «Lo planificado cubre» aparece siempre en el panel del día (Hoy, Semana y Mes): sin platillos muestra la meta diaria; con platillos sin datos ofrece «Estimar con IA».
+- «Estimar nutrientes con IA» genera un prompt con los ingredientes y porciones de los platillos del día (solo los que no tienen datos, o todo el día), tu perfil y tu meta; la respuesta JSON actualiza la nutrición de esas recetas y guarda una sugerencia del día (`dayTips`).
+- Detalle por platillo dentro de la tarjeta. En Más: estimar todo el recetario sin datos.

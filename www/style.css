@@ -650,3 +650,20 @@ body[data-view=cook] #toast{bottom:calc(100px + var(--sab))}
 .day-panel .ti-txt b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .day-panel .ti-check,.day-panel .ti-cook{width:36px;height:36px}
 .ck-ring .tring-l{display:none}
+
+/* nutrición del día: detalle, sugerencia de la IA y acciones */
+.nutri{grid-template-columns:auto minmax(0,1fr)}
+.nutri-tip,.nutri-f{grid-column:1/-1}
+.nutri-f{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.nutri.none .btn{margin-top:10px}
+.ntip{display:flex;gap:10px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:var(--r-sm);background:color-mix(in srgb,var(--saffron) 16%,transparent);color:var(--ink);font-size:.88rem}
+.ntip .ic{width:18px;height:18px;color:var(--m-desayuno);margin-top:2px}
+.nutri.none .ntip{margin-top:10px}
+.ndish{list-style:none;margin:8px 0 0;padding:0;font-size:.82rem}
+.ndish li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 0;border-top:1px dashed var(--line)}
+.ndish .pip{background:var(--c)}
+.ndish b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ndish em{color:var(--muted);font-weight:400}
+.ti{grid-template-columns:50px minmax(0,1fr)}
+.day-panel .ti{grid-template-columns:44px minmax(0,1fr)}
+.ti-card{min-width:0}

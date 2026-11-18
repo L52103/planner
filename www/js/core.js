@@ -232,7 +232,7 @@ const Native = {
 };
 
 /* ───────── estado ───────── */
-const emptyState = () => ({ version: 3, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null });
+const emptyState = () => ({ version: 3, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null, dayTips: {} });
 let S = emptyState();
 
 function normalizeState(d) {
@@ -274,6 +274,7 @@ function normalizeState(d) {
     s.lists = [{ id: uid(), name: 'Mi lista', createdAt: Date.now(), from: '', to: '', removed: [], items: d.shop.extra.filter(e => e && e.name).map(e => normItem({ name: e.name, checked: e.checked })) }];
   }
   if (d.profile && typeof d.profile === 'object') s.profile = { ...d.profile };
+  if (d.dayTips && typeof d.dayTips === 'object') for (const [k, v] of Object.entries(d.dayTips)) if (validDate(k) && v) s.dayTips[k] = String(v).slice(0, 600);
   return s;
 }
 function save() { S.updatedAt = Date.now(); return Store.save(S); }
