@@ -194,7 +194,7 @@ const A = {
       }
       ui.undo = { plan: before, label: `(${res.planned} importados)` };
       await save(); closeDlg(); render();
-      toast(`Calendario importado: ${res.planned} platillos${res.added ? `, ${res.added} recetas nuevas` : ''}${res.skipped.length ? `, ${res.skipped.length} omitidos` : ''}`);
+      toast(`Calendario importado: ${res.planned} platillos${res.added ? `, ${res.added} recetas nuevas` : ''}${res.tips ? `, ${res.tips} sugerencias del día` : ''}${res.skipped.length ? `, ${res.skipped.length} omitidos` : ''}`);
     } catch (e) { $('#og-msg').textContent = e.message; }
   },
   undoPlan: async () => { if (!ui.undo) return; S.plan = JSON.parse(ui.undo.plan); ui.undo = null; await save(); render(); toast('Cambio deshecho'); },
@@ -271,7 +271,7 @@ const A = {
   /* IA y datos */
   importDlg,
   togglePrompt: () => { const p = $('#promptPre'); p.hidden = !p.hidden; },
-  copyPrompt: () => copyText(AI_PROMPT, 'Prompt copiado. Pégalo en tu IA.'),
+  copyPrompt: () => copyText(aiPrompt(), 'Prompt copiado. Pégalo en tu IA.'),
   doImport: async () => {
     try {
       const res = importAI($('#imp-text').value, $('#imp-replace').checked);
@@ -281,6 +281,7 @@ const A = {
       if (res.updated) parts.push(`${res.updated} actualizadas`);
       if (res.planned) parts.push(`${res.planned} en el plan`);
       if (res.skipped.length) parts.push(`${res.skipped.length} del plan omitidas`);
+      if (res.tips) parts.push(`${res.tips} ${res.tips === 1 ? 'sugerencia' : 'sugerencias'} del día`);
       toast('Importado: ' + (parts.join(', ') || 'nada nuevo'));
     } catch (e) { $('#imp-msg').textContent = e.message; }
   },
@@ -386,6 +387,8 @@ const C = {
     if (ui.org.mode === 'auto') orgRefresh(); else renderOrgKeep();
   },
   orgOpt: (d, el) => { readOrgExtra(); ui.org[d.k] = el.checked; renderOrgKeep(); },
+  rulesOn: async (d, el) => { readOrgExtra(); S.profile = { ...profile(), rulesOn: el.checked }; await save(); renderOrgKeep(); if (el.checked) $('#og-rules')?.focus(); },
+  rulesText: async (d, el) => { S.profile = { ...profile(), rules: el.value }; await save(); if (ui.org?.showPrompt) renderOrgKeep(); },
   orgExtra: (d, el) => { ui.org.extra = el.value; if (ui.org.showPrompt) renderOrgKeep(); },
   profField: async (d, el) => {
     const p = profile();

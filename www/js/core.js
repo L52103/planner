@@ -165,7 +165,7 @@ function highlightNutr(r) {
 }
 
 /* ───────── perfil nutricional y metas ───────── */
-const PROFILE_DEFAULT = { sex: 'mujer', age: 22, activity: 'moderada', weight: '', goal: 'energia', restrictions: '', servings: 1 };
+const PROFILE_DEFAULT = { sex: 'mujer', age: 22, activity: 'moderada', weight: '', goal: 'energia', restrictions: '', servings: 1, rules: '', rulesOn: false };
 const ACTIVITY = { sedentaria: 'Sedentaria (poco movimiento)', moderada: 'Moderada (camino o hago ejercicio algunos días)', activa: 'Activa (ejercicio casi todos los días)' };
 const GOALS = { energia: 'Tener energía y rendir bien en el día a día', mantener: 'Mantener mi peso comiendo equilibrado', bajar: 'Bajar de peso de forma saludable', musculo: 'Ganar masa muscular' };
 const ACT_SHORT = { sedentaria: 'Sedentaria', moderada: 'Moderada (ejercicio algunos días)', activa: 'Activa (casi a diario)' };

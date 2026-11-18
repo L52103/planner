@@ -60,3 +60,8 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - La tarjeta «Lo planificado cubre» aparece siempre en el panel del día (Hoy, Semana y Mes): sin platillos muestra la meta diaria; con platillos sin datos ofrece «Estimar con IA».
 - «Estimar nutrientes con IA» genera un prompt con los ingredientes y porciones de los platillos del día (solo los que no tienen datos, o todo el día), tu perfil y tu meta; la respuesta JSON actualiza la nutrición de esas recetas y guarda una sugerencia del día (`dayTips`).
 - Detalle por platillo dentro de la tarjeta. En Más: estimar todo el recetario sin datos.
+
+## Versión 4.2 (prompts con contexto y petición especial)
+- «Importar con IA» del recetario genera el prompt en el momento: fecha de hoy y fechas reales en el ejemplo, perfil y meta diaria, lista de recetas que ya existen (no repetir, sí usarlas en el plan), nutrición obligatoria por receta y `dayTips`.
+- «Completar con IA» pide `dayTips` por día (antes pedía un resumen que no se guardaba). Ambos importadores guardan las sugerencias en el día.
+- Petición especial: cuadro opcional de reglas obligatorias (una por línea, guardadas en el perfil: `rules`, `rulesOn`). Se insertan arriba del prompt, numeradas y con prioridad sobre todo lo demás, y se pide verificarlas antes de responder. Aplica a los dos prompts.

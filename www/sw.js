@@ -1,4 +1,4 @@
-const CACHE = 'planner-v7';
+const CACHE = 'planner-v9';
 const SHELL = ['./', 'index.html', 'style.css', 'fonts.css', 'js/core.js', 'js/shop.js', 'js/timers.js', 'js/views.js', 'js/dialogs.js', 'js/actions.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

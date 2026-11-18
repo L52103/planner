@@ -133,7 +133,19 @@ function cookSheet(k) {
 
 /* ───────── Recetas con IA ───────── */
 const NUTR_JSON = '"nutrition": { "kcal": 450, "protein": 22, "carbs": 60, "fat": 12, "fiber": 9, "iron": 6, "calcium": 120 }';
-const AI_PROMPT = `Eres un asistente de cocina. Responde ÚNICAMENTE con un JSON válido (sin texto adicional; puede ir dentro de un bloque \`\`\`json) con este formato:
+// Petición especial: reglas que la IA debe cumplir sí o sí (una por línea, guardadas en el perfil)
+const ruleLines = () => { const p = profile(); return p.rulesOn ? String(p.rules || '').split('\n').map(x => x.replace(/^[-*\d.)\s]+/, '').trim()).filter(Boolean) : []; };
+function rulesSection() {
+  const r = ruleLines();
+  return r.length ? `## Petición especial: reglas obligatorias\nEstas reglas tienen prioridad sobre todo lo demás y deben cumplirse sí o sí en todas las recetas y en todos los días:\n${r.map((x, i) => `${i + 1}. ${x}`).join('\n')}\nSi alguna no se puede cumplir, no la ignores: explícalo en "dayTips" del primer día.` : '';
+}
+const rulesCheck = () => ruleLines().length ? '\n- Antes de responder, revisa una por una que se cumplan TODAS las reglas obligatorias de la petición especial.' : '';
+
+// Prompt de "Importar con IA": se arma en el momento con la fecha de hoy, tu perfil y tus recetas
+function aiPrompt() {
+  const p = profile(), g = dailyGoals(p), t = todayStr(), t1 = ymd(addDays(new Date(), 1));
+  const names = S.recipes.map(r => r.name);
+  return `Eres un asistente de cocina y nutrición. Hoy es ${longDate(t).toLowerCase()} (${t}). Responde ÚNICAMENTE con un JSON válido (sin texto adicional; puede ir dentro de un bloque \`\`\`json) con este formato:
 
 {
   "schema": "planner/3",
@@ -144,12 +156,12 @@ const AI_PROMPT = `Eres un asistente de cocina. Responde ÚNICAMENTE con un JSON
       "category": "almuerzo",
       "difficulty": "facil",
       "description": "Descripción breve",
-      "servings": 4,
+      "servings": ${p.servings},
       "prepMinutes": 15,
       "cookMinutes": 30,
-      "tags": ["vegetariano", "económico"],
+      "tags": ["alto en hierro", "económico"],
       "ingredients": [
-        { "name": "Lentejas", "quantity": 300, "unit": "g" },
+        { "name": "Lentejas", "quantity": 80, "unit": "g" },
         { "name": "Sal", "quantity": 0, "unit": "" }
       ],
       "steps": [
@@ -161,25 +173,40 @@ const AI_PROMPT = `Eres un asistente de cocina. Responde ÚNICAMENTE con un JSON
     }
   ],
   "plan": [
-    { "date": "2026-11-20", "recipe": "Nombre de la receta", "meal": "almuerzo", "time": "13:30", "servings": 4 }
+    { "date": "${t1}", "recipe": "Nombre de la receta", "meal": "almuerzo", "time": "13:30", "servings": ${p.servings} }
+  ],
+  "dayTips": [
+    { "date": "${t1}", "tip": "Cuánto cubre el día de la meta y qué ajustar" }
   ]
 }
 
-Reglas:
+## Mi perfil
+- ${p.sex === 'mujer' ? 'Mujer' : 'Hombre'} de ${p.age} años${num(p.weight, 0) ? `, ${num(p.weight, 0)} kg` : ''}, actividad ${p.activity}. Objetivo: ${GOALS[p.goal].toLowerCase()}.
+- Meta diaria aproximada: ${g.kcal} kcal, ${g.protein} g de proteína, ${g.fiber} g de fibra, ${g.iron} mg de hierro y ${g.calcium} mg de calcio.
+- Restricciones o alergias: ${String(p.restrictions).trim() || 'ninguna'}. Porciones por comida: ${p.servings}.
+
+## Recetas que ya tengo
+${names.length ? names.slice(0, 80).map(n => '- ' + n).join('\n') + (names.length > 80 ? `\n- (y ${names.length - 80} más)` : '') : '- (todavía ninguna)'}
+No las repitas en "recipes"; sí puedes usarlas en "plan" con su nombre exacto.
+${rulesSection() ? '\n' + rulesSection() + '\n' : ''}
+## Reglas
 - "category": desayuno, almuerzo, merienda, cena, postre u otro. "difficulty": facil, media o dificil. "emoji": un solo emoji de comida.
 - "quantity" es un número (0 si es "al gusto"). "unit" corta: g, kg, ml, l, taza, cda, cdita, pieza, diente, lata…
 - "timerMinutes" solo si el paso requiere esperar; si no, 0. Un paso = una acción clara.
-- "nutrition" es POR PORCIÓN y aproximado: kcal, protein (g), carbs (g), fat (g), fiber (g), iron (mg), calcium (mg).
-- "plan" es opcional. "recipe" debe coincidir exactamente con un "name" de "recipes" (o con una receta que ya tengo). "meal": desayuno, almuerzo, merienda o cena. Fechas AAAA-MM-DD, horas HH:MM (24 h).
-- Usa nombres de ingredientes y unidades consistentes entre recetas para que la lista de compras sume bien.
+- "nutrition" es POR PORCIÓN y aproximado: kcal, protein (g), carbs (g), fat (g), fiber (g), iron (mg), calcium (mg). Obligatorio en cada receta.
+- "plan" solo si pido organizar días: fechas AAAA-MM-DD desde hoy (${t}) en adelante, "meal" desayuno, almuerzo, merienda o cena y "time" HH:MM (24 h). Salvo que diga otra cosa, incluye las 4 comidas de cada día y que entre todas sumen aproximadamente mi meta diaria. "recipe" debe coincidir exactamente con un "name" de "recipes" o de mis recetas.
+- "dayTips" opcional: una frase por día planificado con cuánto cubre de la meta y qué ajustar.
+- Usa nombres de ingredientes y unidades consistentes entre recetas para que la lista de compras sume bien.${rulesCheck()}
 
-Lo que quiero: [DESCRIBE AQUÍ: tipo de comida, porciones, restricciones, presupuesto, cuántos días o semanas planificar…]`;
+## Lo que quiero
+[DESCRIBE AQUÍ: tipo de comida, cuántas recetas, si quieres que organice días o semanas, presupuesto, gustos…]`;
+}
 
 function importDlg() {
   openDlg(`${dlgHead('Importar respuesta de la IA', 'Recetas con IA')}
   <ol class="howto"><li>Copia el prompt y pégalo en tu IA, describiendo lo que quieres al final.</li><li>Copia su respuesta completa.</li><li>Pégala aquí abajo e importa.</li></ol>
   <div class="row"><button class="btn" data-act="copyPrompt">${ic('copy')}Copiar prompt</button><button class="btn ghost" data-act="togglePrompt">Ver prompt</button></div>
-  <pre class="prompt" id="promptPre" hidden>${esc(AI_PROMPT)}</pre>
+  <pre class="prompt big" id="promptPre" hidden>${esc(aiPrompt())}</pre>
   <label for="imp-text">Respuesta de la IA</label><textarea id="imp-text" placeholder='{"recipes": [ … ]}' style="min-height:170px"></textarea>
   <div class="row"><label class="btn ghost sm file">${ic('up')}Elegir archivo .json<input id="imp-file" type="file" accept="application/json,.json,.txt" hidden></label>
     <label class="check"><input type="checkbox" id="imp-replace"> Reemplazar recetas con el mismo nombre</label></div>
@@ -229,7 +256,12 @@ function importAI(text, replace) {
   }
   S.recipes = staged;
   for (const { date, item } of adds) { (S.plan[date] = S.plan[date] || []).push(item); planned++; }
-  return { added, updated, planned, skipped };
+  let tips = 0;
+  const rawTips = Array.isArray(data) ? null : (data.dayTips ?? data.consejos);
+  const putTip = (d, tip) => { if (validDate(String(d)) && tip) { S.dayTips[d] = String(tip).trim().slice(0, 600); tips++; } };
+  if (Array.isArray(rawTips)) rawTips.forEach(x => putTip(x?.date ?? x?.fecha, x?.tip ?? x?.consejo));
+  else if (rawTips && typeof rawTips === 'object') Object.entries(rawTips).forEach(([d, tip]) => putTip(d, tip));
+  return { added, updated, planned, skipped, tips };
 }
 
 /* ───────── Organizar días (recetario o IA) ───────── */
@@ -323,6 +355,7 @@ function planPrompt(o) {
   out.push(nutri
     ? `Actúa como nutricionista y planificador de menús. Organiza mi menú del ${o.from} al ${o.to} priorizando que cubra mis necesidades nutricionales para tener energía y rendir bien cada día.`
     : `Organiza mi menú del ${o.from} al ${o.to}.`);
+  if (rulesSection()) out.push(rulesSection());
   if (nutri) {
     out.push(`## Mi perfil\n- ${who}\n- Objetivo: ${GOALS[p.goal]}.\n- Restricciones, alergias o cosas que no como: ${String(p.restrictions).trim() || 'ninguna'}.\n- Porciones por comida: ${p.servings}.`);
     out.push(`## Prioridad nutricional (metas diarias de referencia para mi perfil${p.age < 19 || p.age > 30 ? '; ajústalas a mi edad' : ''})\n${nutriTargets(p).map(x => '- ' + x).join('\n')}\n\nCada día debe sumar estas metas entre todas sus comidas. No te saltes el desayuno y equilibra cada plato (verdura + proteína + carbohidrato integral).`);
@@ -330,7 +363,7 @@ function planPrompt(o) {
   out.push(`## Recetas de mi recetario (usa el nombre exacto)\n${recipes || '- (todavía no tengo recetas)'}\n\n${o.allowNew
     ? `Usa primero estas recetas. Si con ellas no se cubren bien ${nutri ? 'las metas nutricionales' : 'todas las comidas'} o se repiten demasiado, propón recetas nuevas${nutri ? ' equilibradas' : ''} en "recipes", completas con ingredientes, pasos y "nutrition" por porción.`
     : 'Usa SOLO recetas de esta lista.'}`);
-  out.push(`## Formato de respuesta\nResponde ÚNICAMENTE con un JSON válido, sin texto antes ni después (puede ir dentro de un bloque \`\`\`json):\n{\n${o.allowNew ? `  "recipes": [\n${RECIPE_FORMAT}\n  ],\n` : ''}  "plan": [\n    { "date": "${o.from}", "recipe": "Nombre exacto", "meal": "desayuno", "time": "08:00", "servings": ${p.servings} }\n  ]${nutri ? ',\n  "nutritionNotes": "Resumen breve de cómo el plan cubre las metas"' : ''}\n}\n\nReglas:\n- "recipe" debe coincidir exactamente con un nombre de mi recetario${o.allowNew ? ' o de "recipes"' : ''}.\n- "meal": desayuno, almuerzo, merienda o cena. "time" en HH:MM (24 h).\n- Fechas AAAA-MM-DD entre ${o.from} y ${o.to}${nutri ? ', con las 4 comidas de cada día' : ''}.\n- Evita repetir la misma receta en días seguidos.${o.allowNew ? '\n- En recetas nuevas: "category" (desayuno, almuerzo, merienda, cena, postre u otro), "difficulty" (facil, media o dificil), "quantity" numérica (0 si es al gusto), unidades cortas (g, ml, taza, cda, pieza…) y "nutrition" por porción (kcal, protein, carbs, fat, fiber en g; iron y calcium en mg).' : ''}`);
+  out.push(`## Formato de respuesta\nResponde ÚNICAMENTE con un JSON válido, sin texto antes ni después (puede ir dentro de un bloque \`\`\`json):\n{\n${o.allowNew ? `  "recipes": [\n${RECIPE_FORMAT}\n  ],\n` : ''}  "plan": [\n    { "date": "${o.from}", "recipe": "Nombre exacto", "meal": "desayuno", "time": "08:00", "servings": ${p.servings} }\n  ]${nutri ? ',\n  "dayTips": [\n    { "date": "${o.from}", "tip": "Cuánto cubre el día de la meta y qué ajustar" }\n  ]' : ''}\n}\n\nReglas:\n- "recipe" debe coincidir exactamente con un nombre de mi recetario${o.allowNew ? ' o de "recipes"' : ''}.\n- "meal": desayuno, almuerzo, merienda o cena. "time" en HH:MM (24 h).\n- Fechas AAAA-MM-DD entre ${o.from} y ${o.to}${nutri ? ', con las 4 comidas de cada día' : ''}.\n- Evita repetir la misma receta en días seguidos.${rulesCheck()}${nutri ? '\n- "dayTips": una frase por día con cuánto cubre de la meta y qué ajustar.' : ''}${o.allowNew ? '\n- En recetas nuevas: "category" (desayuno, almuerzo, merienda, cena, postre u otro), "difficulty" (facil, media o dificil), "quantity" numérica (0 si es al gusto), unidades cortas (g, ml, taza, cda, pieza…) y "nutrition" por porción (kcal, protein, carbs, fat, fiber en g; iron y calcium en mg).' : ''}`);
   out.push(`## Lo que quiero\n${o.extra.trim() || '[Añade aquí detalles: días que como fuera, presupuesto, gustos, tiempo para cocinar…]'}`);
   return out.join('\n\n');
 }
@@ -366,6 +399,10 @@ function renderOrg() {
       ${o.nutri ? profileFields(true) : ''}
       <label class="check"><input type="checkbox" data-chg="orgOpt" data-k="allowNew" ${o.allowNew ? 'checked' : ''}> <span><b>Permitir recetas nuevas</b><span class="muted">Si las tuyas no bastan, la IA puede proponer otras; se añadirán a tu recetario.</span></span></label>
     </div>
+    <div class="rule-box">
+      <label class="check"><input type="checkbox" data-chg="rulesOn" ${profile().rulesOn ? 'checked' : ''}> <span><b>Petición especial (obligatoria)</b><span class="muted">Reglas que la IA debe cumplir sí o sí. Una por línea; se guardan para la próxima vez.</span></span></label>
+      ${profile().rulesOn ? `<textarea id="og-rules" data-chg="rulesText" aria-label="Reglas obligatorias, una por línea" placeholder="Nada de cerdo ni mariscos&#10;Cena ligera, máximo 500 kcal&#10;Pescado al menos 2 veces por semana&#10;Desayunos de menos de 15 minutos">${esc(profile().rules)}</textarea>` : ''}
+    </div>
     <label for="og-extra">Algo más que quieras pedir</label><input id="og-extra" value="${esc(o.extra)}" placeholder="Ej. como fuera los sábados, presupuesto ajustado, me gusta lo picante" data-chg="orgExtra">
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="orgCopyPrompt">${ic('copy')}Copiar prompt</button><button class="btn ghost" data-act="orgTogglePrompt" aria-expanded="${o.showPrompt}">${o.showPrompt ? 'Ocultar prompt' : 'Ver prompt'}</button></div>
     ${o.showPrompt ? `<pre class="prompt big">${esc(planPrompt(o))}</pre>` : ''}
@@ -378,7 +415,10 @@ function renderOrg() {
   <div class="seg" role="group"><button class="${o.mode === 'auto' ? 'on' : ''}" data-act="orgMode" data-mode="auto" aria-pressed="${o.mode === 'auto'}">${ic('book')}Con mi recetario</button><button class="${o.mode === 'import' ? 'on' : ''}" data-act="orgMode" data-mode="import" aria-pressed="${o.mode === 'import'}">${ic('spark')}Con IA</button></div>
   ${body}`);
 }
-const readOrgExtra = () => { if (ui.org && $('#og-extra')) ui.org.extra = $('#og-extra').value; };
+const readOrgExtra = () => {
+  if (ui.org && $('#og-extra')) ui.org.extra = $('#og-extra').value;
+  if ($('#og-rules')) S.profile = { ...profile(), rules: $('#og-rules').value };
+};
 function renderOrgKeep() {
   const txt = $('#og-text') ? $('#og-text').value : '', top = dlg.scrollTop;
   renderOrg();

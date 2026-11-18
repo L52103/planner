@@ -667,3 +667,10 @@ body[data-view=cook] #toast{bottom:calc(100px + var(--sab))}
 .ti{grid-template-columns:50px minmax(0,1fr)}
 .day-panel .ti{grid-template-columns:44px minmax(0,1fr)}
 .ti-card{min-width:0}
+
+/* petición especial: reglas obligatorias para la IA */
+.rule-box{margin-top:14px;padding:6px 14px 12px;border-radius:var(--r);background:color-mix(in srgb,var(--tomato) 9%,var(--bg));border-left:4px solid var(--tomato)}
+.rule-box>label.check{align-items:flex-start;padding:10px 0;gap:12px}
+.rule-box>label.check>span{display:flex;flex-direction:column;gap:2px}
+.rule-box>label.check input{margin-top:2px;accent-color:var(--tomato)}
+.rule-box textarea{min-height:96px;background:var(--surface)}
