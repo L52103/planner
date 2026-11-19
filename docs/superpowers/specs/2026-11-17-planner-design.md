@@ -70,3 +70,9 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - Supabase, proyecto `planner` (sa-east-1). Tablas `recipes` (columnas reales + JSON para ingredientes, pasos y nutrición), `plan_days`, `shopping_lists`, `user_settings`; `updated_at` lo pone el servidor y los borrados son lógicos. RLS por `auth.uid()`.
 - Cuenta personal con correo y contraseña. Offline-first: `js/cloud.js` compara huellas por entidad (receta, día, lista, ajustes) con la última sincronización; aplica lo remoto si no hubo cambio local, sube lo local cambiado y, si cambió en ambos lados, gana lo local. En la primera sincronización de un dispositivo se descartan recetas idénticas por nombre y contenido (evita duplicar los ejemplos).
 - Se sincroniza tras cada guardado (2,5 s), al abrir la app, al volver la conexión y cada 2 minutos. El service worker ya no cachea peticiones a otros dominios.
+
+## Versión 2.4 (sistema de actualizaciones)
+- Versión única en `package.json`, Android (`versionCode`/`versionName`) y `www/js/version.js` (`APP_VERSION`), actualizada por `scripts/release.mjs`.
+- Publicación: función Edge `publish-release` (token en cabecera `x-publish-token`, validado contra `release_config`), que sube el APK al bucket público `releases`, registra la versión en la tabla `releases` y reescribe `latest.json`.
+- App (`js/updates.js`): consulta `latest.json` al abrir y cada 6 h; aviso en Hoy y Más con novedades, «Más tarde» recuerda la versión descartada; punto rojo en el engranaje. Android abre la descarga del APK con @capacitor/browser; PC/web indica `git pull`.
+- Firma: todas las versiones usan la misma clave (la de las 2.0–2.3), guardada en `release_config`; Gradle la toma de `android/keystore/planner.keystore` si existe.

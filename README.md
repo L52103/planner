@@ -54,3 +54,16 @@ Tablas (cada usuario solo ve sus filas, protegido con RLS):
 | `user_settings` | Perfil nutricional, reglas obligatorias y sugerencias por día. |
 
 **Cargar recetas directamente en la base**: en el panel de Supabase, *Table Editor → recipes → Insert row*. Rellena al menos `name` y `user_id` (tu id de usuario, en *Authentication → Users*); `ingredients` con el formato `[{"name": "Lentejas", "qty": 300, "unit": "g"}]` y `steps` con `[{"text": "Cocina", "timer": 25}]`. La app las trae en la siguiente sincronización. Los borrados son lógicos (`deleted = true`).
+
+## Actualizaciones
+La app avisa sola cuando hay una versión nueva (al abrirla y cada 6 horas). En **Hoy** aparece el aviso con las novedades y en **Más → Actualizaciones** puedes buscar a mano.
+- **Android**: «Actualizar» descarga el APK nuevo; ábrelo y se instala encima, sin perder datos (todas las versiones van firmadas con la misma clave).
+- **PC**: indica ejecutar `git pull` en la carpeta del planner y recargar.
+
+### Publicar una versión
+```bash
+PUBLISH_TOKEN=… node scripts/release.mjs 2.5.0 "Novedad 1" "Novedad 2"
+```
+Sube el número de versión (package.json, Android y `www/js/version.js`), compila el APK, comprueba la firma y lo publica en Supabase (bucket `releases`, `latest.json` y tabla `releases`) mediante la función `publish-release`. Sin `PUBLISH_TOKEN` solo compila.
+
+La clave de firma (`android/keystore/planner.keystore`) y el token **no están en git**: se guardan en la tabla privada `release_config` de Supabase (solo accesible desde el servidor). Si la clave se pierde, Android no dejará instalar encima y habría que desinstalar la app.

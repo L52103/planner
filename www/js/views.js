@@ -114,6 +114,7 @@ function viewToday() {
   const t = todayStr(), items = dayItems(t), done = items.filter(i => i.done).length;
   const pending = S.lists.reduce((a, l) => a + l.items.filter(i => !i.checked).length, 0);
   return `${appBar(greet, esc(longDate(t)), `<button class="btn icon ghost" data-act="timerSheet" aria-label="Temporizadores">${ic('timer')}</button>`)}
+  <div id="upd-banner-host">${updateBanner()}</div>
   <div class="today-grid">
     <div class="tg-main">${nextHero()}${nutriCard(t)}</div>
     <section class="tg-day"><div class="sec-h"><h2>Tu día</h2><span class="muted">${items.length ? `${done} de ${items.length} hechos` : ''}</span></div>${dayTimeline(t)}
@@ -521,6 +522,7 @@ function cloudPanel() {
 function viewMore() {
   const g = dailyGoals();
   return `${appBar('Más', 'Perfil, IA y datos', '', { noGear: true })}
+  <div id="upd-banner-host">${updateBanner()}</div>
   <div class="more-grid">
     ${cloudPanel()}
     <section class="panel span2"><h2>${ic('user')}Perfil nutricional</h2><p class="muted">Define tus metas diarias: ${fmtNum(g.kcal)} kcal, ${g.protein} g de proteína, ${g.iron} mg de hierro y ${g.calcium} mg de calcio. Se usan en el resumen de cada día y en el prompt para la IA.</p>${profileFields(false)}</section>
@@ -534,6 +536,9 @@ function viewMore() {
     <section class="panel"><h2>${ic('bell')}Avisos del temporizador</h2><p>${IS_NATIVE ? 'La app usa alarmas de Android: suenan aunque la cierres. Revisa que tenga permiso de notificaciones.' : 'Permite notificaciones para que el temporizador avise aunque cambies de pestaña.'}</p>
       <button class="btn" data-act="askNotif">Activar notificaciones</button></section>
     <section class="panel"><h2>${ic('book')}Recetas de ejemplo</h2><p>12 recetas variadas con datos nutricionales. No duplica las que ya tengas.</p><button class="btn" data-act="loadSamples">Cargar ejemplos</button></section>
+    <section class="panel"><h2>${ic('down')}Actualizaciones</h2><p>Versión instalada: <b>${esc(APP_VERSION.name)}</b>${IS_NATIVE ? ' (Android)' : ''}.</p>
+      <p id="upd-status" class="muted">${esc(Updates.statusText())}</p>
+      <div class="row"><button class="btn" data-act="updCheck">Buscar actualizaciones</button>${Updates.available() ? `<button class="btn primary" data-act="updInstall">${ic('down')}Actualizar a ${esc(Updates.latest.versionName)}</button>` : ''}</div></section>
     <section class="panel"><h2>${ic('trash')}Borrar datos</h2><p>Elimina recetas, plan y listas de este dispositivo${Cloud.user ? ' y de tu cuenta en la nube' : ''}.</p><button class="btn danger" data-act="wipe">Borrar todo</button></section>
   </div>
   <p class="muted center small">${S.recipes.length} recetas, ${planCount()} platillos planificados, ${S.lists.length} listas.</p>`;
@@ -547,6 +552,7 @@ function render() {
   $('#view').innerHTML = VIEWS[ui.view]();
   $$('#nav [data-view]').forEach(b => { const on = b.dataset.view === NAV_OF[ui.view]; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
   renderTimers();
+  Updates.refresh();
   if (ui.view === 'week') {
     const wrap = $('.wgrid-wrap'), sel = $('.wg-day.sel');
     if (wrap && sel && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = Math.max(0, sel.offsetLeft - 76);

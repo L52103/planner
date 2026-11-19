@@ -1,6 +1,6 @@
 {
   "name": "planner-recetas",
-  "version": "1.0.0",
+  "version": "2.4.1",
   "private": true,
   "description": "Planner de recetas: PWA + app Android (Capacitor)",
   "scripts": {
@@ -13,6 +13,7 @@
     "@capacitor-community/keep-awake": "^8.0.1",
     "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
     "@capacitor/clipboard": "^8.0.1",
     "@capacitor/core": "^8.6.2",
     "@capacitor/filesystem": "^8.1.5",

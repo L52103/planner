@@ -290,6 +290,10 @@ const A = {
   pickBackup: () => $('#backupFile').click(),
   askNotif: async () => { if (IS_NATIVE) { toast(await Native.askNotifications() ? 'Notificaciones activadas' : 'Activa las notificaciones en los ajustes de Android'); return; } try { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notificaciones activadas' : 'El navegador no dio permiso'); } catch { toast('Este navegador no admite notificaciones'); } },
   cloudSync: () => Cloud.sync(),
+  updCheck: () => Updates.check({ manual: true }),
+  updInstall: () => Updates.install(),
+  updLater: () => Updates.later(),
+  updCopyCmd: () => copyText('git pull', 'Comando copiado'),
   cloudOut: async () => { if (!confirm('¿Cerrar sesión? Tus datos se quedan en este dispositivo y en tu cuenta.')) return; await Cloud.signOut(); render(); toast('Sesión cerrada'); },
   wipe: async () => { if (!confirm(Cloud.user ? '¿Borrar todas las recetas, el plan y las listas de este dispositivo y de tu cuenta en la nube?' : '¿Borrar todas las recetas, el plan y las listas de compras de este dispositivo?')) return; S = emptyState(); await save(); render(); toast('Datos borrados'); },
 
@@ -582,6 +586,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   tick();
   setInterval(tick, 250);
   Cloud.init().catch(() => {});
+  Updates.init();
   setInterval(() => { if (ui.view === 'today' && !dlg.open && !document.hidden) render(); }, 60000); // refresca la cuenta regresiva
   if (!IS_NATIVE && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (IS_NATIVE) {
