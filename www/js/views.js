@@ -499,10 +499,30 @@ function profileFields(open = true) {
     <p class="muted small">Valores orientativos de referencia; no sustituyen la consulta con un nutricionista.</p>
   </details>`;
 }
+function cloudPanel() {
+  const u = Cloud.user;
+  if (!Cloud.available()) return `<section class="panel span2" id="cloud-panel" data-user=""><h2>${ic('cloud')}Nube</h2><p class="muted">No se pudo cargar el módulo de la nube. Tus datos siguen guardados en este dispositivo.</p></section>`;
+  if (!u) return `<section class="panel span2 cloud" id="cloud-panel" data-user="">
+    <h2>${ic('cloud')}Tu base de datos en la nube</h2>
+    <p class="muted">Guarda tus recetas, el plan, las listas y tu perfil en tu base de datos, y úsalos igual en el teléfono y en el PC. Sin cuenta, todo sigue funcionando solo en este dispositivo.</p>
+    <form class="cloud-form" data-form="cloud">
+      <div class="grid2"><div><label for="cl-email">Correo</label><input id="cl-email" type="email" autocomplete="email" required></div>
+      <div><label for="cl-pass">Contraseña</label><input id="cl-pass" type="password" autocomplete="current-password" minlength="6" required></div></div>
+      <p id="cl-msg" class="err" role="alert"></p>
+      <div class="row"><button class="btn primary" name="mode" value="in">${ic('cloud')}Entrar</button><button class="btn" name="mode" value="up">Crear cuenta</button></div>
+    </form>
+    <p class="muted small">Al crear la cuenta te llega un correo de confirmación: ábrelo y luego pulsa «Entrar». Lo que ya tienes en este dispositivo se sube a tu cuenta.</p></section>`;
+  return `<section class="panel span2 cloud" id="cloud-panel" data-user="${esc(u.id)}"><h2>${ic('cloud')}Nube conectada</h2>
+    <p>Conectado como <b>${esc(u.email || '')}</b>.</p>
+    <p id="cloud-status" class="cloud-status" data-state="${esc(Cloud.status)}">${esc(Cloud.statusText())}</p>
+    <p class="muted small">Recetas, plan, listas y perfil se guardan en tu base de datos y se sincronizan solos cada vez que cambias algo. Sin internet sigues usando la app y se sincroniza al volver la conexión.</p>
+    <div class="row"><button class="btn primary" data-act="cloudSync">${ic('cloud')}Sincronizar ahora</button><button class="btn ghost" data-act="cloudOut">Cerrar sesión</button></div></section>`;
+}
 function viewMore() {
   const g = dailyGoals();
   return `${appBar('Más', 'Perfil, IA y datos', '', { noGear: true })}
   <div class="more-grid">
+    ${cloudPanel()}
     <section class="panel span2"><h2>${ic('user')}Perfil nutricional</h2><p class="muted">Define tus metas diarias: ${fmtNum(g.kcal)} kcal, ${g.protein} g de proteína, ${g.iron} mg de hierro y ${g.calcium} mg de calcio. Se usan en el resumen de cada día y en el prompt para la IA.</p>${profileFields(false)}</section>
     <section class="panel"><h2>${ic('spark')}Recetas con IA</h2><p>Copia el prompt, pégalo en tu IA (ChatGPT, Claude, Gemini…) y describe lo que quieres. Luego pega aquí su respuesta.</p>
       <div class="row"><button class="btn primary" data-act="importDlg">Importar respuesta</button><button class="btn" data-act="copyPrompt">${ic('copy')}Copiar prompt</button></div></section>
@@ -514,7 +534,7 @@ function viewMore() {
     <section class="panel"><h2>${ic('bell')}Avisos del temporizador</h2><p>${IS_NATIVE ? 'La app usa alarmas de Android: suenan aunque la cierres. Revisa que tenga permiso de notificaciones.' : 'Permite notificaciones para que el temporizador avise aunque cambies de pestaña.'}</p>
       <button class="btn" data-act="askNotif">Activar notificaciones</button></section>
     <section class="panel"><h2>${ic('book')}Recetas de ejemplo</h2><p>12 recetas variadas con datos nutricionales. No duplica las que ya tengas.</p><button class="btn" data-act="loadSamples">Cargar ejemplos</button></section>
-    <section class="panel"><h2>${ic('trash')}Borrar datos</h2><p>Elimina recetas, plan y listas de este dispositivo.</p><button class="btn danger" data-act="wipe">Borrar todo</button></section>
+    <section class="panel"><h2>${ic('trash')}Borrar datos</h2><p>Elimina recetas, plan y listas de este dispositivo${Cloud.user ? ' y de tu cuenta en la nube' : ''}.</p><button class="btn danger" data-act="wipe">Borrar todo</button></section>
   </div>
   <p class="muted center small">${S.recipes.length} recetas, ${planCount()} platillos planificados, ${S.lists.length} listas.</p>`;
 }

@@ -95,6 +95,7 @@ const IC = {
   leaf: '<path d="M5 19c0-9 6-14 15-14 0 9-5 15-14 15"/><path d="M5 19l8-8"/>',
   move: '<path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  cloud: '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.5 4.5 4.5 0 0 0 7 18z"/>',
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 
@@ -277,7 +278,7 @@ function normalizeState(d) {
   if (d.dayTips && typeof d.dayTips === 'object') for (const [k, v] of Object.entries(d.dayTips)) if (validDate(k) && v) s.dayTips[k] = String(v).slice(0, 600);
   return s;
 }
-function save() { S.updatedAt = Date.now(); return Store.save(S); }
+function save() { S.updatedAt = Date.now(); const r = Store.save(S); Cloud.schedule(); return r; }
 
 const getRecipe = id => S.recipes.find(r => r.id === id);
 const totalMin = r => (r.prepMinutes || 0) + (r.cookMinutes || 0);

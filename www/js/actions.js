@@ -289,7 +289,9 @@ const A = {
   exportRecipes: () => { download(`recetas-${todayStr()}.json`, JSON.stringify({ schema: 'planner/3', recipes: S.recipes.map(exportRecipe) }, null, 2)); toast('Recetas exportadas'); },
   pickBackup: () => $('#backupFile').click(),
   askNotif: async () => { if (IS_NATIVE) { toast(await Native.askNotifications() ? 'Notificaciones activadas' : 'Activa las notificaciones en los ajustes de Android'); return; } try { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notificaciones activadas' : 'El navegador no dio permiso'); } catch { toast('Este navegador no admite notificaciones'); } },
-  wipe: async () => { if (!confirm('¿Borrar todas las recetas, el plan y las listas de compras de este dispositivo?')) return; S = emptyState(); await save(); render(); toast('Datos borrados'); },
+  cloudSync: () => Cloud.sync(),
+  cloudOut: async () => { if (!confirm('¿Cerrar sesión? Tus datos se quedan en este dispositivo y en tu cuenta.')) return; await Cloud.signOut(); render(); toast('Sesión cerrada'); },
+  wipe: async () => { if (!confirm(Cloud.user ? '¿Borrar todas las recetas, el plan y las listas de este dispositivo y de tu cuenta en la nube?' : '¿Borrar todas las recetas, el plan y las listas de compras de este dispositivo?')) return; S = emptyState(); await save(); render(); toast('Datos borrados'); },
 
   /* listas de compras */
   newList: () => newListDlg(),
@@ -458,6 +460,20 @@ document.addEventListener('input', e => {
   if (e.target.id === 'pk-q' && ui.pick) { ui.pick.q = e.target.value; $('#pickList').innerHTML = pickList(); }
 });
 document.addEventListener('submit', async e => {
+  const cf = e.target.closest('[data-form=cloud]');
+  if (cf) {
+    e.preventDefault();
+    const email = $('#cl-email').value.trim(), pass = $('#cl-pass').value, up = e.submitter && e.submitter.value === 'up', msg = $('#cl-msg');
+    msg.textContent = ''; $$('button', cf).forEach(b => { b.disabled = true; });
+    try {
+      if (up) {
+        const pending = await Cloud.signUp(email, pass);
+        if (pending) { msg.className = 'ok-msg'; msg.textContent = 'Cuenta creada. Revisa tu correo, confirma la cuenta y luego pulsa «Entrar».'; }
+      } else await Cloud.signIn(email, pass);
+    } catch (err) { msg.className = 'err'; msg.textContent = err.message; }
+    finally { $$('button', cf).forEach(b => { b.disabled = false; }); }
+    return;
+  }
   const f = e.target.closest('[data-form=item]');
   if (!f) return;
   e.preventDefault();
@@ -565,6 +581,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   render();
   tick();
   setInterval(tick, 250);
+  Cloud.init().catch(() => {});
   setInterval(() => { if (ui.view === 'today' && !dlg.open && !document.hidden) render(); }, 60000); // refresca la cuenta regresiva
   if (!IS_NATIVE && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (IS_NATIVE) {

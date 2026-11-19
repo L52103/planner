@@ -40,3 +40,17 @@ Con Android Studio: `npm run sync`, luego abre la carpeta `android/` y pulsa *Ru
 
 ## Datos
 Todo se guarda en el dispositivo. Para pasar datos entre el teléfono y el PC: *Más → Exportar respaldo* y *Importar respaldo*. La sincronización en la nube es la siguiente fase (la persistencia está aislada en `Store` dentro de `www/app.js`).
+
+## Base de datos en la nube (Supabase)
+La app usa el proyecto **planner** de Supabase (PostgreSQL). En la app: **Más → Tu base de datos en la nube**, crea tu cuenta (confirma el correo que llega) y entra. Desde ese momento recetas, plan, listas y perfil se sincronizan solos entre el teléfono y el PC; sin internet todo sigue funcionando y se sincroniza al volver.
+
+Tablas (cada usuario solo ve sus filas, protegido con RLS):
+
+| Tabla | Contenido |
+|---|---|
+| `recipes` | Una fila por receta: nombre, categoría, dificultad, porciones, tiempos, `ingredients` y `steps` (JSON), `nutrition` por porción (JSON), favorita. |
+| `plan_days` | Un día por fila con sus platillos (`items`). |
+| `shopping_lists` | Listas de compras con sus artículos. |
+| `user_settings` | Perfil nutricional, reglas obligatorias y sugerencias por día. |
+
+**Cargar recetas directamente en la base**: en el panel de Supabase, *Table Editor → recipes → Insert row*. Rellena al menos `name` y `user_id` (tu id de usuario, en *Authentication → Users*); `ingredients` con el formato `[{"name": "Lentejas", "qty": 300, "unit": "g"}]` y `steps` con `[{"text": "Cocina", "timer": 25}]`. La app las trae en la siguiente sincronización. Los borrados son lógicos (`deleted = true`).

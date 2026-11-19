@@ -1,4 +1,4 @@
-// Copia las tipografías (latin y latin-ext) a www/fonts para que la app funcione sin internet.
+// Copia las tipografías y la librería de Supabase a www/ para que la app no dependa de CDN.
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 const out = 'www/fonts';
@@ -18,3 +18,6 @@ for (const [pkg, weights] of faces) {
 }
 writeFileSync('www/fonts.css', css);
 console.log('Fuentes copiadas a', out);
+mkdirSync('www/vendor', { recursive: true });
+copyFileSync('node_modules/@supabase/supabase-js/dist/umd/supabase.js', 'www/vendor/supabase.js');
+console.log('Librería de Supabase copiada a www/vendor');

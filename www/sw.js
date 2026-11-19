@@ -1,5 +1,5 @@
-const CACHE = 'planner-v9';
-const SHELL = ['./', 'index.html', 'style.css', 'fonts.css', 'js/core.js', 'js/shop.js', 'js/timers.js', 'js/views.js', 'js/dialogs.js', 'js/actions.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'planner-v10';
+const SHELL = ['./', 'index.html', 'style.css', 'fonts.css', 'vendor/supabase.js', 'js/core.js', 'js/cloud.js', 'js/shop.js', 'js/timers.js', 'js/views.js', 'js/dialogs.js', 'js/actions.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -8,7 +8,7 @@ self.addEventListener('activate', e => {
 });
 // network-first (para recibir actualizaciones), con respaldo offline en caché
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone();

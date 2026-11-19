@@ -674,3 +674,12 @@ body[data-view=cook] #toast{bottom:calc(100px + var(--sab))}
 .rule-box>label.check>span{display:flex;flex-direction:column;gap:2px}
 .rule-box>label.check input{margin-top:2px;accent-color:var(--tomato)}
 .rule-box textarea{min-height:96px;background:var(--surface)}
+
+/* nube */
+.cloud h2 .ic{color:var(--brand)}
+.cloud-form{margin-top:4px}
+.cloud-status{display:flex;align-items:center;gap:8px;font-weight:700;margin:6px 0}
+.cloud-status::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--ok);flex:none}
+.cloud-status[data-state=syncing]::before{background:var(--saffron)}
+.cloud-status[data-state=error]::before,.cloud-status[data-state=offline]::before{background:var(--tomato)}
+.ok-msg{color:var(--ok);font-weight:700;min-height:1em}

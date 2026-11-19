@@ -65,3 +65,8 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - «Importar con IA» del recetario genera el prompt en el momento: fecha de hoy y fechas reales en el ejemplo, perfil y meta diaria, lista de recetas que ya existen (no repetir, sí usarlas en el plan), nutrición obligatoria por receta y `dayTips`.
 - «Completar con IA» pide `dayTips` por día (antes pedía un resumen que no se guardaba). Ambos importadores guardan las sugerencias en el día.
 - Petición especial: cuadro opcional de reglas obligatorias (una por línea, guardadas en el perfil: `rules`, `rulesOn`). Se insertan arriba del prompt, numeradas y con prioridad sobre todo lo demás, y se pide verificarlas antes de responder. Aplica a los dos prompts.
+
+## Versión 5 (base de datos en la nube)
+- Supabase, proyecto `planner` (sa-east-1). Tablas `recipes` (columnas reales + JSON para ingredientes, pasos y nutrición), `plan_days`, `shopping_lists`, `user_settings`; `updated_at` lo pone el servidor y los borrados son lógicos. RLS por `auth.uid()`.
+- Cuenta personal con correo y contraseña. Offline-first: `js/cloud.js` compara huellas por entidad (receta, día, lista, ajustes) con la última sincronización; aplica lo remoto si no hubo cambio local, sube lo local cambiado y, si cambió en ambos lados, gana lo local. En la primera sincronización de un dispositivo se descartan recetas idénticas por nombre y contenido (evita duplicar los ejemplos).
+- Se sincroniza tras cada guardado (2,5 s), al abrir la app, al volver la conexión y cada 2 minutos. El service worker ya no cachea peticiones a otros dominios.

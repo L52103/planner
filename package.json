@@ -4,9 +4,9 @@
   "private": true,
   "description": "Planner de recetas: PWA + app Android (Capacitor)",
   "scripts": {
-    "fonts": "node scripts/copy-fonts.mjs",
+    "assets": "node scripts/copy-assets.mjs",
     "serve": "python3 -m http.server 8123 --directory www",
-    "sync": "npm run fonts && npx cap sync android",
+    "sync": "npm run assets && npx cap sync android",
     "apk": "npm run sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
@@ -17,7 +17,8 @@
     "@capacitor/core": "^8.6.2",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/local-notifications": "^8.3.1",
-    "@capacitor/share": "^8.0.3"
+    "@capacitor/share": "^8.0.3",
+    "@supabase/supabase-js": "^2.119.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.2",
