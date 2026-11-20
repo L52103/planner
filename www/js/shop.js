@@ -22,12 +22,13 @@ function aisleOf(name) {
   return 'Otros';
 }
 const unitKey = u => { const f = fold(u); return f.length > 3 ? f.replace(/e?s$/, '') : f; };
-function aggregate(from, to) {
+function aggregate(from, to, skipDone = false) {
   const map = new Map();
   for (const [date, items] of Object.entries(S.plan)) {
     if (date < from || date > to) continue;
     for (const it of items) {
       if (it.lo) continue; // sobras: ya están cocinadas, no se compran
+      if (skipDone && it.done) continue; // ya cocinado: sus ingredientes ya salieron de la despensa
       const r = getRecipe(it.recipeId);
       if (!r) continue;
       const f = (it.servings || r.servings || 1) / (r.servings || 1);
@@ -90,7 +91,7 @@ const pantryFind = (name, unit) => S.pantry.find(p => pantryKey(p.name, p.unit) 
 // Lo que falta comprar para el plan, descontando la despensa (qty 0 en la despensa = "siempre hay")
 function needFromPlan(from, to) {
   const out = [];
-  for (const e of aggregate(from, to)) {
+  for (const e of aggregate(from, to, true)) {
     const p = pantryFind(e.name, e.unit);
     if (!p) { out.push(e); continue; }
     if (!p.qty) continue; // siempre en casa

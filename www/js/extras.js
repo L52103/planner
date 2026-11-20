@@ -248,13 +248,13 @@ const UNIT_ALIASES = [
 ];
 function parseIngredientLine(line) {
   let s = String(line).replace(/\s+/g, ' ').trim();
-  for (const [k, v] of Object.entries(FRAC)) s = s.replace(new RegExp(`(\\d)?\\s*${k}`), (_, d) => ` ${(d ? Number(d) : 0) + v} `).trim();
+  for (const [k, v] of Object.entries(FRAC)) s = s.replace(new RegExp(`(\\d+)?\\s*${k}`), (_, d) => ` ${(d ? Number(d) : 0) + v} `).trim();
   const m = s.match(/^(\d+(?:[.,]\d+)?)(?:\s+(\d+)\/(\d+)|\/(\d+))?\s*(.*)$/);
   let qty = 0, rest = s;
   if (m) {
     qty = num(m[1], 0);
-    if (m[2]) qty += Number(m[2]) / Number(m[3]);
-    if (m[4]) qty = Number(m[1]) / Number(m[4]);
+    if (m[2] && Number(m[3]) > 0) qty += Number(m[2]) / Number(m[3]);
+    if (m[4] && Number(m[4]) > 0) qty = Number(m[1]) / Number(m[4]);
     rest = m[5];
   }
   let unit = '';
@@ -276,7 +276,7 @@ function guessCat(text) {
   return 'almuerzo';
 }
 function recipeFromWeb(w) {
-  const cat = guessCat(`${w.category} ${w.name}`);
+  const cat = guessCat(`${w.category || ''} ${w.name || ''}`);
   const r = cleanRecipe({
     name: w.name, category: cat, description: w.description, servings: w.servings, prepMinutes: w.prepMinutes, cookMinutes: w.cookMinutes, tags: w.tags,
     ingredients: (w.ingredients || []).map(parseIngredientLine).map(i => ({ name: i.name, quantity: i.qty, unit: i.unit })),
@@ -530,12 +530,15 @@ const Shared = {
   },
   async push(l) {
     if (!Cloud.user || !l.share || this.busy.has(l.id)) return;
+    // Lista llegada por la nube sin historial local: primero se adopta lo que hay en la nube (no se pisa con una copia vieja)
+    if (!this.meta()[l.share.id]) return this.pull(l);
     this.busy.add(l.id);
     try {
       for (let i = 0; i < 5; i++) {
         if (!l.share) return;
         const delta = this.delta(l);
         if (!delta.changed.length && !delta.dels.length && !delta.name) return;
+        const sent = new Map(l.items.map(x => [x.id, itemCanon(x)])), sentName = l.name;
         const { data: row, error } = await Cloud.client.from('shared_lists').select('data,version,name').eq('id', l.share.id).maybeSingle();
         if (error) throw error;
         if (!l.share) return;
@@ -543,7 +546,13 @@ const Shared = {
         const merged = mergeShared({ ...row.data, name: row.name }, delta);
         const { data: up, error: e2 } = await Cloud.client.from('shared_lists').update({ data: merged, name: merged.name || l.name, version: row.version + 1 }).eq('id', l.share.id).eq('version', row.version).select('version');
         if (e2) throw e2;
-        if (up && up.length) { this.apply(l, merged, up[0].version); await Store.save(S); if (ui.view === 'list' && ui.listId === l.id && !document.activeElement?.closest('.add-item, .it-edit')) render(); return; }
+        if (up && up.length) {
+          // Lo que el usuario cambió mientras viajaba la petición se conserva como pendiente (no se pisa)
+          const cur = new Map(l.items.map(x => [x.id, x])), late = new Set(l.items.filter(x => sent.get(x.id) !== itemCanon(x)).map(x => x.id));
+          const inMerged = new Set(merged.items.map(x => x.id));
+          const items = merged.items.filter(x => cur.has(x.id) || !sent.has(x.id)).map(x => (late.has(x.id) ? cur.get(x.id) : x)).concat(l.items.filter(x => late.has(x.id) && !inMerged.has(x.id)));
+          this.apply(l, { name: l.name !== sentName ? l.name : merged.name, items }, up[0].version, merged);
+          await Store.save(S); if (ui.view === 'list' && ui.listId === l.id && !document.activeElement?.closest('.add-item, .it-edit')) render(); continue; }
       }
     } catch {} finally { this.busy.delete(l.id); }
   },
@@ -558,7 +567,7 @@ const Shared = {
     if (!l.share) return;
     const m = this.meta()[l.share.id] || {};
     if (m.v && row.version <= m.v) return;
-    const delta = this.delta(l);
+    const delta = m.v ? this.delta(l) : { changed: [], dels: [], name: '' };
     const remote = { ...(row.data || {}), name: row.name };
     this.apply(l, mergeShared(remote, delta), row.version, remote);
     Store.save(S); Cloud.schedule();
@@ -650,18 +659,19 @@ XA.cookTap = (d, el, e) => {
   if (e.clientX - r.left < r.width * .3) A.cookPrev(); else A.cookNext();
 };
 const Voice = {
-  speakOn: lsGet('planner.cookSpeak', false), listenOn: false, rec: null, speaking: false, lastKey: '', handled: false,
+  speakOn: lsGet('planner.cookSpeak', false), listenOn: false, rec: null, speaking: false, sid: 0, lastKey: '', handled: false,
   canSpeak: () => !!(NP.TextToSpeech || window.speechSynthesis),
   canListen: () => !!(NP.SpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition),
   async speak(text) {
     this.stopSpeak(); this.speaking = true;
+    const id = ++this.sid;
     try {
       if (NP.TextToSpeech) await NP.TextToSpeech.speak({ text, lang: 'es-ES', rate: 1, pitch: 1, volume: 1, category: 'playback' });
       else await new Promise(res => { const u = new SpeechSynthesisUtterance(text); u.lang = 'es-ES'; u.rate = 1; u.onend = u.onerror = res; speechSynthesis.speak(u); setTimeout(res, 60000); });
     } catch {}
-    this.speaking = false;
+    if (this.sid === id) this.speaking = false; // una lectura cancelada no apaga la que ya empezó
   },
-  stopSpeak() { try { if (NP.TextToSpeech) NP.TextToSpeech.stop(); else if (window.speechSynthesis) speechSynthesis.cancel(); } catch {} this.speaking = false; },
+  stopSpeak() { this.sid++; try { if (NP.TextToSpeech) NP.TextToSpeech.stop(); else if (window.speechSynthesis) speechSynthesis.cancel(); } catch {} this.speaking = false; },
   stepText() {
     const c = ui.cook, r = c && getRecipe(c.recipeId);
     if (!r) return '';

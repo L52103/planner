@@ -275,7 +275,7 @@ function normalizeState(d) {
     id: i.id || uid(), name: String(i.name || '').trim(), qty: num(i.qty, 0), unit: String(i.unit || '').trim(),
     aisle: AISLE_NAMES.includes(i.aisle) ? i.aisle : aisleOf(i.name || ''), checked: !!i.checked,
     src: i.src === 'plan' ? 'plan' : 'manual', pkey: i.pkey || '', edited: !!i.edited, recipes: Array.isArray(i.recipes) ? i.recipes.map(String) : [],
-    ...(num(i.price, 0) > 0 ? { price: num(i.price, 0) } : {}), ...(i.at ? { at: Number(i.at) || 0 } : {}), ...(i.have ? { have: String(i.have) } : {}),
+    ...(num(i.price, 0) > 0 ? { price: num(i.price, 0) } : {}), ...(i.at ? { at: Number(i.at) || 0 } : {}), ...(i.have ? { have: String(i.have) } : {}), ...(i.est && num(i.price, 0) > 0 ? { est: true } : {}),
   });
   if (Array.isArray(d.lists)) {
     s.lists = d.lists.filter(l => l && typeof l === 'object').map(l => ({

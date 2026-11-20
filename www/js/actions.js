@@ -130,9 +130,15 @@ const A = {
   sheetMeal: async d => { const it = findItem(ui.sheet.date, ui.sheet.id); it.meal = d.meal; it.time = CATS[d.meal].time; await save(); refreshSheet(); },
   sheetServ: async d => { const it = findItem(ui.sheet.date, ui.sheet.id), r = getRecipe(it.recipeId); it.servings = Math.max(1, (it.servings || r?.servings || 1) + Number(d.n)); await save(); refreshSheet(); },
   removeDish: async d => {
-    const r = getRecipe(findItem(d.date, d.id)?.recipeId);
+    const it = findItem(d.date, d.id), r = getRecipe(it?.recipeId);
     closeDlg();
     await withUndo(`${r ? r.name : 'Platillo'}: quitado del día`, () => {
+      // Sobras sin comer: las porciones vuelven a la nevera
+      if (it && it.lo && !it.done && r) {
+        const lo = S.leftovers.find(x => x.recipeId === r.id);
+        if (lo) lo.portions += it.servings || 1;
+        else S.leftovers.push({ id: uid(), recipeId: r.id, portions: it.servings || 1, date: todayStr(), until: ymd(addDays(new Date(), 1)), src: '' });
+      }
       S.plan[d.date] = (S.plan[d.date] || []).filter(i => i.id !== d.id);
       if (!S.plan[d.date].length) delete S.plan[d.date];
     });
@@ -411,7 +417,7 @@ const A = {
     const l = getList(ui.listId), i = l.items.find(x => x.id === d.id);
     if (i && i.pkey) l.removed = [...new Set([...(l.removed || []), i.pkey])];
     ui.editItem = null;
-    await withUndo(`${i ? i.name : 'Artículo'}: eliminado`, () => { l.items = l.items.filter(x => x.id !== d.id); });
+    await withUndo(`${i ? i.name : 'Artículo'}: eliminado`, () => { if (i) bankSpend([i]); l.items = l.items.filter(x => x.id !== d.id); });
   },
 
   /* cocinar */
@@ -425,7 +431,7 @@ const A = {
   cookFinish: async () => {
     const c = ui.cook, ref = c.ref, it = ref && findItem(ref.date, ref.id);
     let res = null;
-    if (it) { if (!it.done) { it.done = true; res = onDishDone(ref.date, it, true); } }
+    if (it) { if (!it.done) { it.done = true; res = onDishDone(ref.date, it, true); } else { const h = S.history.filter(x => x.src === it.id).pop(); if (h) res = { h }; } }
     else { const r = getRecipe(c.recipeId); if (r) res = logCooked(r, c.servings, todayStr()); }
     await save(); A.cookExit();
     if (res && res.h) { rateDlg(res.h.id); if (res.left) toast(`Te sobran ${res.left} ${res.left === 1 ? 'porción' : 'porciones'}: las verás en Hoy`); }
