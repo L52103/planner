@@ -876,3 +876,7 @@ input[aria-invalid=true]{border-color:var(--tomato)}
 
 .ck-prog button,.ck-prog button.d,.ck-prog button.n{background:transparent}
 .wk-track i.none{visibility:hidden}
+/* 2.5: barra de app en móvil — el título nunca queda bajo los botones */
+@media (max-width:480px){.appbar:not(.sticky){flex-wrap:wrap;row-gap:6px}.appbar:not(.sticky) .ab-t{flex:1 1 auto;min-width:min-content}.appbar:not(.sticky) .ab-a{margin-left:auto}}
+/* 2.5: la valoración (★ 4,5) no pasa bajo el botón de planificar de la ficha */
+.tile .meta-row{padding-right:46px;flex-wrap:wrap;row-gap:0}
