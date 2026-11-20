@@ -66,7 +66,7 @@ const Updates = {
       <pre class="prompt">git pull</pre>
       <ol class="howto" start="3"><li>Reinicia el servidor y recarga con Ctrl + Shift + R.</li></ol>
       <div class="row"><button class="btn" data-act="updCopyCmd">${ic('copy')}Copiar comando</button>${m.android?.url ? `<a class="btn ghost" href="${esc(m.android.url)}" download>${ic('down')}Descargar APK para Android</a>` : ''}</div>
-      <div class="dlg-f"><button class="btn primary" data-act="closeDlg">Listo</button></div>`);
+      <div class="dlg-f"><button class="btn primary" data-act="closeDlg">Cerrar</button></div>`);
   },
   statusText() {
     if (this.checking) return 'Buscando actualizaciones…';

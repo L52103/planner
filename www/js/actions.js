@@ -49,6 +49,13 @@ async function moveItem(from, id, to, meal) {
   closeDlg(); render();
   toast(`Movido a ${relDay(to).toLowerCase()}${meal ? `, ${CATS[meal].name.toLowerCase()}` : ''}`);
 }
+// Ejecuta un cambio y ofrece Deshacer en el aviso (restaura el estado anterior)
+async function withUndo(msg, fn) {
+  const snap = JSON.stringify(S);
+  await fn();
+  await save(); render();
+  toast(msg, { label: 'Deshacer', run: async () => { S = normalizeState(JSON.parse(snap)); await save(); render(); toast('Cambio deshecho'); } });
+}
 const refreshSheet = () => { render(); if (ui.sheet && dlg.open) renderItemSheet(); };
 
 /* ───────── acciones (data-act) ───────── */
@@ -69,6 +76,8 @@ const A = {
   },
   openDay: d => { ui.day = d.date; ui.weekStart = weekStartOf(d.date); go('week'); },
   closeDlg,
+  cdOk: () => cdDone(true),
+  cdCancel: () => { closeDlg(); cdDone(false); },
 
   /* añadir rápido */
   quickAdd,
@@ -121,9 +130,12 @@ const A = {
   sheetMeal: async d => { const it = findItem(ui.sheet.date, ui.sheet.id); it.meal = d.meal; it.time = CATS[d.meal].time; await save(); refreshSheet(); },
   sheetServ: async d => { const it = findItem(ui.sheet.date, ui.sheet.id), r = getRecipe(it.recipeId); it.servings = Math.max(1, (it.servings || r?.servings || 1) + Number(d.n)); await save(); refreshSheet(); },
   removeDish: async d => {
-    S.plan[d.date] = (S.plan[d.date] || []).filter(i => i.id !== d.id);
-    if (!S.plan[d.date].length) delete S.plan[d.date];
-    await save(); closeDlg(); render(); toast('Quitado del día');
+    const r = getRecipe(findItem(d.date, d.id)?.recipeId);
+    closeDlg();
+    await withUndo(`${r ? r.name : 'Platillo'}: quitado del día`, () => {
+      S.plan[d.date] = (S.plan[d.date] || []).filter(i => i.id !== d.id);
+      if (!S.plan[d.date].length) delete S.plan[d.date];
+    });
   },
   moveDish: d => moveDlg(d.date, d.id),
   moveTo: d => moveItem(d.from, d.id, d.date),
@@ -169,7 +181,9 @@ const A = {
     const dates = Object.keys(S.plan).filter(d => d >= from && d <= to);
     const n = dates.reduce((a, d) => a + S.plan[d].length, 0);
     if (!n) return toast('No hay nada planificado en esas fechas');
-    if (!confirm(`¿Quitar ${n} platillos planificados entre ${fmtShortDate(from)} y ${fmtShortDate(to)}? Las recetas no se borran.`)) return;
+    const ok = await confirmDlg({ title: `Quitar ${n} ${n === 1 ? 'platillo' : 'platillos'} del plan`, text: `Se vaciarán los días entre el ${esc(fmtShortDate(from))} y el ${esc(fmtShortDate(to))}. Tus recetas no se borran.`, ok: `Quitar ${n} ${n === 1 ? 'platillo' : 'platillos'}` });
+    if (!ui.org) return;
+    if (!ok) return renderOrg();
     snapshotPlan(`(${n} quitados)`);
     dates.forEach(d => delete S.plan[d]);
     await save(); orgRefresh(); render(); toast(`${n} platillos quitados`);
@@ -206,10 +220,15 @@ const A = {
   bulkFav: async () => { const rs = S.recipes.filter(r => ui.sel.has(r.id)); const on = !rs.every(r => r.fav); rs.forEach(r => { r.fav = on; }); await save(); $('#bookGrid').innerHTML = bookGrid(); toast(on ? 'Marcadas como favoritas' : 'Quitadas de favoritas'); },
   bulkDel: async () => {
     const n = ui.sel.size;
-    if (!n || !confirm(`¿Eliminar ${n} ${n === 1 ? 'receta' : 'recetas'}? También se quitarán de los días donde estén planificadas.`)) return;
-    S.recipes = S.recipes.filter(r => !ui.sel.has(r.id));
-    for (const [date, items] of Object.entries(S.plan)) { S.plan[date] = items.filter(i => !ui.sel.has(i.recipeId)); if (!S.plan[date].length) delete S.plan[date]; }
-    ui.sel = new Set(); await save(); render(); toast(`${n} ${n === 1 ? 'receta eliminada' : 'recetas eliminadas'}`);
+    if (!n) return;
+    const names = S.recipes.filter(r => ui.sel.has(r.id)).map(r => r.name);
+    if (!await confirmDlg({ title: `Eliminar ${n} ${n === 1 ? 'receta' : 'recetas'}`, text: `${esc(names.slice(0, 5).join(', '))}${names.length > 5 ? '…' : ''}. También se quitarán de los días donde estén planificadas.`, ok: `Eliminar ${n} ${n === 1 ? 'receta' : 'recetas'}` })) return;
+    closeDlg();
+    await withUndo(`${n} ${n === 1 ? 'receta eliminada' : 'recetas eliminadas'}`, () => {
+      S.recipes = S.recipes.filter(r => !ui.sel.has(r.id));
+      for (const [date, items] of Object.entries(S.plan)) { S.plan[date] = items.filter(i => !ui.sel.has(i.recipeId)); if (!S.plan[date].length) delete S.plan[date]; }
+      ui.sel = new Set();
+    });
   },
   bookCat: d => { ui.cat = d.cat; render(); },
   clearFilters: () => { ui.cat = 'all'; ui.q = ''; render(); },
@@ -225,10 +244,15 @@ const A = {
     const cat = d && CATS[d.cat] ? d.cat : 'almuerzo';
     if (ui.view !== 'editor') ui.returnTo = ui.view;
     ui.draft = { name: '', emoji: CATS[cat].emoji, category: cat, difficulty: 'facil', description: '', servings: 2, prepMinutes: 0, cookMinutes: 0, tags: [], ingredients: [{ name: '', qty: 0, unit: '' }, { name: '', qty: 0, unit: '' }], steps: [{ text: '', timer: 0 }], nutrition: null, notes: '' };
-    ui.emojiOpen = false; go('editor'); $('#e-name')?.focus();
+    ui.emojiOpen = false; ui.draftRestored = false;
+    const dr = !(d && d.fresh) && Drafts.get();
+    if (dr && dr.draft && !dr.draft.id) { ui.draft = dr.draft; ui.pendingPlan = ui.pendingPlan || dr.pendingPlan; ui.draftRestored = true; }
+    go('editor'); $('#e-name')?.focus();
   },
   editRecipe: d => {
-    ui.pendingPlan = null; ui.draft = JSON.parse(JSON.stringify(getRecipe(d.id))); ui.returnTo = ui.view === 'cook' ? 'recipe' : ui.view; ui.recipeId = d.id; ui.emojiOpen = false;
+    ui.pendingPlan = null; ui.draft = JSON.parse(JSON.stringify(getRecipe(d.id))); ui.returnTo = ui.view === 'cook' ? 'recipe' : ui.view; ui.recipeId = d.id; ui.emojiOpen = false; ui.draftRestored = false;
+    const dr = Drafts.get();
+    if (dr && dr.draft && dr.draft.id === d.id) { ui.draft = dr.draft; ui.draftRestored = true; }
     if (ui.cook) { ui.cook = null; releaseWake(); }
     go('editor');
   },
@@ -236,15 +260,23 @@ const A = {
   delRecipe: async d => {
     const r = getRecipe(d.id);
     const used = Object.values(S.plan).flat().filter(i => i.recipeId === d.id).length;
-    if (!confirm(`¿Eliminar «${r.name}»?${used ? `\nTambién se quitará de ${used} ${used === 1 ? 'día' : 'días'} del plan.` : ''}`)) return;
-    S.recipes = S.recipes.filter(x => x.id !== d.id);
-    for (const [date, items] of Object.entries(S.plan)) { S.plan[date] = items.filter(i => i.recipeId !== d.id); if (!S.plan[date].length) delete S.plan[date]; }
-    ui.draft = null; ui.sel.delete(d.id);
-    await save(); go('book'); toast('Receta eliminada');
+    if (!await confirmDlg({ title: `Eliminar «${esc(r.name)}»`, text: used ? `También se quitará de ${used} ${used === 1 ? 'día' : 'días'} del plan.` : 'La receta se borra del recetario.', ok: 'Eliminar receta' })) return;
+    ui.draft = null; ui.sel.delete(d.id); Drafts.clear();
+    go('book');
+    await withUndo(`«${r.name}» eliminada`, () => {
+      S.recipes = S.recipes.filter(x => x.id !== d.id);
+      for (const [date, items] of Object.entries(S.plan)) { S.plan[date] = items.filter(i => i.recipeId !== d.id); if (!S.plan[date].length) delete S.plan[date]; }
+    });
   },
   toggleEmoji: () => { readEditor(); ui.emojiOpen = !ui.emojiOpen; render(); },
   setEmoji: d => { readEditor(); ui.draft.emoji = d.e; ui.emojiOpen = false; render(); },
-  cancelEdit: () => { ui.draft = null; ui.pendingPlan = null; go(ui.returnTo || 'book'); },
+  cancelEdit: () => { ui.draft = null; ui.pendingPlan = null; ui.draftRestored = false; Drafts.clear(); go(ui.returnTo || 'book'); },
+  discardDraft: () => {
+    const id = ui.draft?.id; Drafts.clear(); ui.draftRestored = false;
+    ui.draft = id ? JSON.parse(JSON.stringify(getRecipe(id))) : null;
+    if (!ui.draft) return A.newRecipe({ cat: 'almuerzo', fresh: true });
+    render(); toast('Cambios descartados');
+  },
   addIng: () => { readEditor(); ui.draft.ingredients.push({ name: '', qty: 0, unit: '' }); refreshEditorRows(); $$('#ings .i-name').pop()?.focus(); },
   delIng: d => { readEditor(); ui.draft.ingredients.splice(Number(d.n), 1); refreshEditorRows(); },
   addStep: () => { readEditor(); ui.draft.steps.push({ text: '', timer: 0 }); refreshEditorRows(); $$('#steps .s-text').pop()?.focus(); },
@@ -253,7 +285,7 @@ const A = {
   saveRecipe: async () => {
     readEditor();
     const d = ui.draft;
-    if (!d.name.trim()) { toast('Escribe el nombre de la receta'); return $('#e-name').focus(); }
+    if (!d.name.trim()) { showFieldErr('e-name', 'Escribe el nombre de la receta para guardarla.'); return $('#e-name').focus(); }
     const c = cleanRecipe(d);
     let id = d.id;
     if (id) { const i = S.recipes.findIndex(r => r.id === id); S.recipes[i] = { ...S.recipes[i], ...c, id }; }
@@ -262,7 +294,7 @@ const A = {
     const pp = ui.pendingPlan;
     if (pp) { addToPlan(pp.date, id, pp.meal, pp.time); msg = `Receta guardada y añadida a ${relDay(pp.date).toLowerCase()}`; ui.day = pp.date; }
     await save();
-    ui.draft = null; ui.pendingPlan = null;
+    ui.draft = null; ui.pendingPlan = null; ui.draftRestored = false; Drafts.clear();
     toast(msg);
     if (!pp && (ui.returnTo === 'book' || ui.returnTo === 'recipe')) { ui.recipeId = id; ui.detailServ = null; go('recipe'); }
     else go(ui.returnTo || 'book');
@@ -294,8 +326,12 @@ const A = {
   updInstall: () => Updates.install(),
   updLater: () => Updates.later(),
   updCopyCmd: () => copyText('git pull', 'Comando copiado'),
-  cloudOut: async () => { if (!confirm('¿Cerrar sesión? Tus datos se quedan en este dispositivo y en tu cuenta.')) return; await Cloud.signOut(); render(); toast('Sesión cerrada'); },
-  wipe: async () => { if (!confirm(Cloud.user ? '¿Borrar todas las recetas, el plan y las listas de este dispositivo y de tu cuenta en la nube?' : '¿Borrar todas las recetas, el plan y las listas de compras de este dispositivo?')) return; S = emptyState(); await save(); render(); toast('Datos borrados'); },
+  cloudOut: async () => { if (!await confirmDlg({ title: 'Cerrar sesión', text: 'Tus datos se quedan en este dispositivo y en tu cuenta; dejarán de sincronizarse hasta que vuelvas a entrar.', ok: 'Cerrar sesión', danger: false })) return; closeDlg(); await Cloud.signOut(); render(); toast('Sesión cerrada'); },
+  wipe: async () => {
+    if (!await confirmDlg({ title: 'Borrar todos los datos', text: `Se borran ${S.recipes.length} recetas, ${planCount()} platillos planificados y ${S.lists.length} listas ${Cloud.user ? 'de este dispositivo y de tu cuenta en la nube' : 'de este dispositivo'}.`, ok: 'Borrar todo' })) return;
+    closeDlg();
+    await withUndo('Datos borrados', () => { S = emptyState(); });
+  },
 
   /* listas de compras */
   newList: () => newListDlg(),
@@ -305,7 +341,22 @@ const A = {
   nlCreate: async () => { readNl(); const n = ui.nl; const l = createList(n.name, n.from, n.to, n.mode === 'plan'); await save(); ui.listId = l.id; ui.editItem = null; ui.aisle = 'all'; go('list'); toast('Lista creada'); },
   openList: d => { ui.listId = d.id; ui.editItem = null; ui.aisle = 'all'; go('list'); },
   aisleFilter: d => { ui.aisle = d.a; render(); },
-  listRename: d => {
+  listRename: (d, el) => {
+    const l = getList(d.id), h1 = el.closest('h1');
+    if (!h1) return;
+    const inp = document.createElement('input');
+    inp.className = 'title-edit'; inp.value = l.name; inp.setAttribute('aria-label', 'Nombre de la lista');
+    const done = async keep => {
+      if (inp.dataset.done) return; inp.dataset.done = '1';
+      const v = inp.value.trim();
+      if (keep && v && v !== l.name) { l.name = v; await save(); toast('Lista renombrada'); }
+      render();
+    };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
+    inp.addEventListener('blur', () => done(true));
+    h1.replaceChildren(inp); inp.focus(); inp.select();
+  },
+  listRenameDlg: d => {
     const l = getList(d.id);
     openDlg(`${dlgHead('Renombrar lista')}<label for="rn-name">Nombre</label><input id="rn-name" value="${esc(l.name)}">
       <div class="dlg-f"><button class="btn" data-act="closeDlg">Cancelar</button><button class="btn primary" data-act="listRenameSave" data-id="${l.id}">${ic('check')}Guardar</button></div>`);
@@ -326,15 +377,22 @@ const A = {
   listClearChecked: async d => {
     const l = getList(d.id), gone = l.items.filter(i => i.checked);
     if (!gone.length) return toast('No hay nada marcado');
-    l.removed = [...new Set([...(l.removed || []), ...gone.filter(i => i.pkey).map(i => i.pkey)])];
-    l.items = l.items.filter(i => !i.checked); await save(); render(); toast(`${gone.length} quitados de la lista`);
+    await withUndo(`${gone.length} quitados de la lista`, () => {
+      l.removed = [...new Set([...(l.removed || []), ...gone.filter(i => i.pkey).map(i => i.pkey)])];
+      l.items = l.items.filter(i => !i.checked);
+    });
   },
   listDup: async d => {
     const l = getList(d.id), c = JSON.parse(JSON.stringify(l));
     c.id = uid(); c.name = l.name + ' (copia)'; c.createdAt = Date.now(); c.items.forEach(i => { i.id = uid(); i.checked = false; });
     S.lists.splice(S.lists.indexOf(l) + 1, 0, c); await save(); render(); toast('Lista duplicada');
   },
-  listDelete: async d => { const l = getList(d.id); if (!confirm(`¿Eliminar la lista «${l.name}»?`)) return; S.lists = S.lists.filter(x => x.id !== d.id); await save(); go('shop'); toast('Lista eliminada'); },
+  listDelete: async d => {
+    const l = getList(d.id);
+    if (!await confirmDlg({ title: `Eliminar la lista «${esc(l.name)}»`, text: `${l.items.length} ${l.items.length === 1 ? 'artículo' : 'artículos'}. Tus recetas y el plan no cambian.`, ok: 'Eliminar lista' })) return;
+    go('shop');
+    await withUndo(`Lista «${l.name}» eliminada`, () => { S.lists = S.lists.filter(x => x.id !== d.id); });
+  },
   itemEdit: d => { ui.editItem = d.id; render(); $('#ie-name')?.focus(); },
   itemCancel: () => { ui.editItem = null; render(); },
   itemSave: async d => {
@@ -348,7 +406,8 @@ const A = {
   itemDel: async d => {
     const l = getList(ui.listId), i = l.items.find(x => x.id === d.id);
     if (i && i.pkey) l.removed = [...new Set([...(l.removed || []), i.pkey])];
-    l.items = l.items.filter(x => x.id !== d.id); ui.editItem = null; await save(); render(); toast('Artículo eliminado');
+    ui.editItem = null;
+    await withUndo(`${i ? i.name : 'Artículo'}: eliminado`, () => { l.items = l.items.filter(x => x.id !== d.id); });
   },
 
   /* cocinar */
@@ -453,13 +512,25 @@ document.addEventListener('change', e => {
       try {
         const d = JSON.parse(t);
         if (!d || !Array.isArray(d.recipes) || typeof d.plan !== 'object' || Array.isArray(d.plan)) throw new Error('Este archivo no es un respaldo del planner. Para recetas sueltas usa «Importar respuesta de la IA».');
-        if (!confirm('El respaldo reemplazará los datos de este dispositivo. ¿Continuar?')) return;
-        S = normalizeState(d); await save(); render(); toast('Respaldo importado');
+        if (!await confirmDlg({ title: 'Reemplazar con el respaldo', text: `El respaldo trae ${d.recipes.length} recetas. Reemplazará los datos actuales${Cloud.user ? ', también en tu cuenta' : ''}.`, ok: 'Reemplazar datos' })) return;
+        closeDlg();
+        await withUndo('Respaldo importado', () => { S = normalizeState(d); });
       } catch (err) { toast(err.message); }
     });
   }
 });
+function showFieldErr(id, msg) {
+  const inp = document.getElementById(id), err = document.getElementById(id + '-err');
+  if (inp) inp.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  if (err) err.textContent = msg || '';
+}
+let draftT;
+document.addEventListener('focusout', e => {
+  if (e.target.dataset?.blur === 'reqName' && !e.target.value.trim() && e.target.dataset.touched) showFieldErr(e.target.id, 'Escribe el nombre de la receta para guardarla.');
+});
 document.addEventListener('input', e => {
+  if (e.target.id === 'e-name') { e.target.dataset.touched = '1'; showFieldErr('e-name', ''); }
+  if (ui.view === 'editor' && ui.draft && e.target.closest('.editor, .appbar')) { clearTimeout(draftT); draftT = setTimeout(() => { readEditor(); Drafts.save(ui.draft); }, 400); }
   if (e.target.id === 'q') { ui.q = e.target.value; $('#bookGrid').innerHTML = bookGrid(); }
   if (e.target.id === 'pk-q' && ui.pick) { ui.pick.q = e.target.value; $('#pickList').innerHTML = pickList(); }
 });
@@ -570,6 +641,29 @@ document.addEventListener('drop', e => {
   moveItem(dr.date, dr.id, cell.dataset.dropDate, cell.dataset.dropMeal);
 });
 document.addEventListener('dragend', () => { ui.dragging = null; $$('.wg-cell.over, .wg-dish.moving').forEach(c => c.classList.remove('over', 'moving')); });
+
+/* tooltips: botones solo con icono muestran su nombre (aria-label) al pasar el ratón o con foco de teclado */
+const TIP_SEL = '.btn.icon[aria-label], .rh-btn[aria-label], .tile-fav, .tile-plan, .ti-check, .ti-cook, .wg-add, .ck-btn[aria-label], .tm-btn.icon';
+const tipEl = Object.assign(document.createElement('div'), { id: 'tip', role: 'tooltip' });
+document.body.appendChild(tipEl);
+let tipT;
+function showTip(el) {
+  const label = el.getAttribute('aria-label'); if (!label) return;
+  tipEl.textContent = label;
+  const r = el.getBoundingClientRect(), tw = tipEl.offsetWidth;
+  tipEl.style.left = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2)) + 'px';
+  tipEl.style.top = (r.top > 44 ? r.top - 36 : r.bottom + 8) + 'px';
+  tipEl.classList.add('show');
+}
+const hideTip = () => { clearTimeout(tipT); tipEl.classList.remove('show'); };
+if (matchMedia('(hover: hover)').matches) {
+  document.addEventListener('pointerover', e => { const el = e.target.closest(TIP_SEL); if (!el) return; clearTimeout(tipT); tipT = setTimeout(() => showTip(el), 350); });
+  document.addEventListener('pointerout', e => { if (e.target.closest(TIP_SEL)) hideTip(); });
+}
+document.addEventListener('focusin', e => { const el = e.target.closest?.(TIP_SEL); if (el && el.matches(':focus-visible')) showTip(el); else hideTip(); });
+document.addEventListener('focusout', hideTip);
+document.addEventListener('click', hideTip, true);
+document.addEventListener('scroll', hideTip, true);
 
 /* pantalla encendida mientras se cocina */
 let wake = null;

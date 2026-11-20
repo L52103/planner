@@ -239,9 +239,10 @@ function bookGrid() {
 function viewBook() {
   return `${appBar('Recetario', `${S.recipes.length} ${S.recipes.length === 1 ? 'receta' : 'recetas'}`, `
     <button class="btn icon ghost" data-act="importDlg" aria-label="Importar recetas con IA">${ic('spark')}</button>
-    <button class="btn${ui.bookEdit ? ' primary' : ' ghost'}" data-act="bookEdit" aria-pressed="${ui.bookEdit}">${ui.bookEdit ? ic('check') + 'Listo' : 'Organizar'}</button>
+    <button class="btn${ui.bookEdit ? ' primary' : ' ghost'}" data-act="bookEdit" aria-pressed="${ui.bookEdit}">${ui.bookEdit ? ic('check') + 'Terminar' : 'Organizar'}</button>
     ${ui.bookEdit ? '' : `<button class="btn primary d-only" data-act="newRecipe">${ic('plus')}Nueva receta</button>`}`)}
-  <div class="toolbar"><label class="search">${ic('search')}<input id="q" type="search" placeholder="Busca receta o ingrediente" value="${esc(ui.q)}" aria-label="Buscar recetas"></label>
+  <label class="search-name" for="q">Buscar recetas</label>
+  <div class="toolbar"><label class="search">${ic('search')}<input id="q" type="search" placeholder="Nombre, ingrediente o etiqueta" value="${esc(ui.q)}" aria-label="Buscar recetas"></label>
     <select id="sort" data-chg="sort" aria-label="Ordenar">${[['name', 'Nombre'], ['time', 'Más rápidas'], ['kcal', 'Menos calorías'], ['new', 'Recientes']].map(([k, v]) => `<option value="${k}" ${ui.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
   ${catChips(ui.cat, 'bookCat', 'scroll-x')}
   <div id="bookGrid">${bookGrid()}</div>`;
@@ -312,11 +313,13 @@ function viewEditor() {
     <div class="ab-t">${ui.pendingPlan ? `<p class="ab-sub">Se añadirá a ${esc(relDay(ui.pendingPlan.date).toLowerCase())}, ${CATS[ui.pendingPlan.meal].name.toLowerCase()}</p>` : ''}<h1>${d.id ? 'Editar receta' : 'Nueva receta'}</h1></div>
     <div class="ab-a"><button class="btn primary" data-act="saveRecipe">${ic('check')}Guardar</button></div></header>
   <div class="editor">
+  ${ui.draftRestored ? `<div class="draft-note" role="status">${ic('edit')}<span>Recuperamos los cambios que no habías guardado.</span><button class="btn sm ghost" data-act="discardDraft">Descartar cambios</button></div>` : ''}
   <section class="panel">
     <div class="ed-top">
       <div class="emoji-pick"><button class="plate xl c-${d.category}" data-act="toggleEmoji" aria-label="Cambiar icono" aria-expanded="${!!ui.emojiOpen}">${esc(d.emoji)}</button>
       ${ui.emojiOpen ? `<div class="emoji-grid">${EMOJIS.map(e => `<button data-act="setEmoji" data-e="${e}" aria-label="${e}">${e}</button>`).join('')}</div>` : ''}</div>
-      <div class="grow"><label for="e-name">Nombre</label><input id="e-name" value="${esc(d.name)}" placeholder="Ej. Lentejas con verduras" autocomplete="off">
+      <div class="grow"><label for="e-name">Nombre</label><input id="e-name" value="${esc(d.name)}" placeholder="Ej. Lentejas con verduras" autocomplete="off" aria-describedby="e-name-err" data-blur="reqName">
+      <p id="e-name-err" class="field-err" role="alert"></p>
       <label for="e-desc">Descripción corta</label><input id="e-desc" value="${esc(d.description)}" placeholder="Qué es y por qué te gusta"></div>
     </div>
     <div class="grid2">
@@ -408,11 +411,11 @@ function viewList() {
   <div class="lh-prog"><div class="pbar big"><b style="width:${total ? (got / total) * 100 : 0}%"></b></div><span><b>${got}</b>/${total}</span></div>
   ${present.length > 1 ? `<div class="chips scroll-x">${['all', ...present].map(a => `<button class="chip${ui.aisle === a ? ' on' : ''}" data-act="aisleFilter" data-a="${esc(a)}" aria-pressed="${ui.aisle === a}">${a === 'all' ? 'Todo' : AISLE_SHORT[a]}</button>`).join('')}</div>` : ''}
   <form class="add-item" data-form="item">
-    <input id="ni-name" placeholder="Añadir artículo" autocomplete="off" aria-label="Nuevo artículo">
-    <input id="ni-qty" inputmode="decimal" placeholder="Cant." aria-label="Cantidad">
-    <input id="ni-unit" list="units" placeholder="Unidad" aria-label="Unidad">
-    ${aisleSelect('ni-aisle', '', true)}
-    <button class="btn primary" aria-label="Añadir">${ic('plus')}<span>Añadir</span></button>
+    <label class="ai-name">Artículo<input id="ni-name" placeholder="Ej. papel de cocina" autocomplete="off"></label>
+    <label>Cantidad<input id="ni-qty" inputmode="decimal" placeholder="0"></label>
+    <label>Unidad<input id="ni-unit" list="units" placeholder="pieza"></label>
+    <label class="ai-aisle">Pasillo${aisleSelect('ni-aisle', '', true)}</label>
+    <button class="btn primary">${ic('plus')}<span>Añadir artículo</span></button>
   </form>
   ${AISLE_NAMES.filter(a => groups[a]).map(a => `<section class="aisle"><h3>${a}<span>${groups[a].length}</span></h3><ul class="items">${groups[a].map(itemRow).join('')}</ul></section>`).join('')
     || (total ? `<div class="empty small">${ic('check', 'big')}<h3>${got === total ? 'Todo en el carrito' : 'Nada en este pasillo'}</h3></div>` : `<div class="empty small"><p>La lista está vacía. Añade artículos arriba${l.from ? ' o actualízala desde el plan' : ''}.</p></div>`)}

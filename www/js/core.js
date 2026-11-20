@@ -50,12 +50,21 @@ const weekStartOf = s => { const d = parseYmd(s); return ymd(addDays(d, -((d.get
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let toastT;
-function toast(msg) {
+// Aviso breve; con `action` muestra un botón (p. ej. Deshacer) y dura más
+function toast(msg, action) {
   const t = $('#toast');
-  t.textContent = msg;
+  t.textContent = '';
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'toast-act'; b.textContent = action.label;
+    b.addEventListener('click', ev => { ev.stopPropagation(); t.classList.remove('show', 'has-action'); action.run(); });
+    t.appendChild(b);
+  }
+  t.classList.toggle('has-action', !!action);
   t.classList.add('show');
   clearTimeout(toastT);
-  toastT = setTimeout(() => t.classList.remove('show'), 2800);
+  toastT = setTimeout(() => t.classList.remove('show', 'has-action'), action ? 7000 : 2800);
 }
 
 /* ───────── iconos ───────── */
@@ -394,6 +403,14 @@ function addSamples() {
   for (const s of SAMPLES) if (!have.has(fold(s.name))) { S.recipes.push({ ...cleanRecipe(s), id: uid(), fav: false, createdAt: Date.now() }); n++; }
   return n;
 }
+
+/* ───────── borrador del editor de recetas ───────── */
+const Drafts = {
+  key: 'planner.draft',
+  save(d) { try { localStorage.setItem(this.key, JSON.stringify({ draft: d, pendingPlan: ui.pendingPlan, returnTo: ui.returnTo, at: Date.now() })); } catch {} },
+  get() { try { return JSON.parse(localStorage.getItem(this.key)); } catch { return null; } },
+  clear() { try { localStorage.removeItem(this.key); } catch {} },
+};
 
 /* ───────── estado de interfaz ───────── */
 const ui = {

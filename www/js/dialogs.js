@@ -2,11 +2,23 @@
 'use strict';
 
 const dlg = $('#dlg');
+// Confirmación propia: nombra lo que se borra y el botón dice la acción. Cancelar es el foco por defecto.
+let cdResolve = null;
+function confirmDlg({ title, text = '', ok, danger = true }) {
+  return new Promise(res => {
+    if (cdResolve) cdResolve(false);
+    cdResolve = res;
+    openDlg(`${dlgHead(title)}${text ? `<p class="cd-text">${text}</p>` : ''}
+      <div class="dlg-f"><button class="btn" data-act="cdCancel">Cancelar</button><button class="btn ${danger ? 'danger-fill' : 'primary'}" data-act="cdOk">${ok}</button></div>`);
+    $('[data-act=cdCancel]').focus();
+  });
+}
+const cdDone = v => { const r = cdResolve; cdResolve = null; if (r) r(v); };
 function openDlg(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); }
 function closeDlg() { if (dlg.open) dlg.close(); }
 dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
 // Al cerrar se limpia el estado del diálogo (salvo que otro se haya abierto enseguida)
-dlg.addEventListener('close', () => { if (dlg.open) return; ui.pick = null; ui.pd = null; ui.nl = null; ui.org = null; ui.sheet = null; ui.na = null; });
+dlg.addEventListener('close', () => { cdDone(false); if (dlg.open) return; ui.pick = null; ui.pd = null; ui.nl = null; ui.org = null; ui.sheet = null; ui.na = null; });
 const dlgHead = (title, sub = '', lead = '') => `<div class="dlg-h">${lead}<div>${sub ? `<p class="muted">${sub}</p>` : ''}<h2>${title}</h2></div><button class="btn icon ghost" data-act="closeDlg" aria-label="Cerrar">${ic('x')}</button></div>`;
 
 function dayChips(selected, act, extra = '') {
@@ -63,7 +75,7 @@ function renderPick() {
   <label class="search">${ic('search')}<input id="pk-q" type="search" placeholder="Busca en tu recetario" value="${esc(p.q)}" aria-label="Buscar en el recetario"></label>
   ${catChips(p.cat, 'pickCat', 'scroll-x')}
   <div id="pickList" class="pick-list">${pickList()}</div>
-  <div class="dlg-f"><span class="muted" id="pick-count">${p.added.length ? `${p.added.length} ${p.added.length === 1 ? 'añadida' : 'añadidas'}` : ''}</span><button class="btn primary" data-act="closeDlg">Listo</button></div>`);
+  <div class="dlg-f"><span class="muted" id="pick-count">${p.added.length ? `${p.added.length} ${p.added.length === 1 ? 'añadida' : 'añadidas'}` : ''}</span><button class="btn primary" data-act="closeDlg">Cerrar</button></div>`);
 }
 
 /* ───────── Platillo planificado (hoja de opciones) ───────── */
