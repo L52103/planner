@@ -76,3 +76,65 @@ Calendario mensual -> Día (platos con hora/porciones) · Recetas (lista, editor
 - Publicación: función Edge `publish-release` (token en cabecera `x-publish-token`, validado contra `release_config`), que sube el APK al bucket público `releases`, registra la versión en la tabla `releases` y reescribe `latest.json`.
 - App (`js/updates.js`): consulta `latest.json` al abrir y cada 6 h; aviso en Hoy y Más con novedades, «Más tarde» recuerda la versión descartada; punto rojo en el engranaje. Android abre la descarga del APK con @capacitor/browser; PC/web indica `git pull`.
 - Firma: todas las versiones usan la misma clave (la de las 2.0–2.3), guardada en `release_config`; Gradle la toma de `android/keystore/planner.keystore` si existe.
+
+## Versión 2.5 (auditoría UX, voz, despensa, presupuesto y listas compartidas)
+Código nuevo en `www/js/extras.js` (acciones `XA` y cambios `XC` que se suman a `A` y `C`); `save()` llama a `afterSave()`, que reprograma recordatorios y sincroniza listas compartidas (800 ms).
+
+### Interfaz y auditoría UX
+- Diálogos propios que nombran la entidad con botón de verbo (`confirmDlg`); acciones reversibles con aviso «Deshacer» (`withUndo`).
+- Borrador del editor (`Drafts`, `localStorage` `planner.draft`): autoguardado a los 400 ms, se restaura con aviso y «Descartar cambios».
+- Renombrar listas en el sitio, validación en línea, tooltips, objetivos de 44 px y texto mínimo de 12 px.
+- Insignia de sincronización en la barra superior (`syncBadge`, estados `ok`/`syncing`/`error`/`off`); tocarla sincroniza o lleva a conectar la cuenta.
+- Bienvenida en 3 pasos (perfil, metas, cómo empezar); marca `planner.onboarded` en `localStorage`.
+
+### Modelo de datos
+Estado `version: 4`, con `normalizeExtra()` en `core.js`:
+- `S.pantry`: `[{id, name, qty, unit, at}]`. `qty` 0 significa «siempre hay». Clave de comparación `pantryKey(name, unit)` (nombre sin tildes + unidad normalizada).
+- `S.prices`: `{ "nombre|unidad": precioUnitario }`, recordado al guardar lo comprado (`rememberPrice`).
+- `S.history`: `[{id, recipeId, date, rating 0–5, src (id del platillo), at, used?: [{name, unit, qty}]}]`. `used` registra lo descontado de la despensa para poder devolverlo al desmarcar.
+- `S.leftovers`: `[{id, recipeId, portions, date, until, src}]`; `until` = fecha cocinada + 3 días.
+- `S.prefs`: objeto libre. `rem` `{cook, defrost, defrostAt}` (recordatorios), `budget` (por semana), `currency`, `spent` `{ "lunes YYYY-MM-DD": monto }` (gasto de artículos ya retirados de las listas, se conservan 26 semanas).
+- Platillo del plan: `lo: true` cuando son sobras (no se compran ni generan recordatorios ni nuevas sobras).
+- Artículo de lista: `price` (precio de la línea), `est` (precio estimado desde `S.prices`), `at` (momento en que se marcó comprado, para el gasto semanal), `have` (texto «X en la despensa»).
+- Lista: `share: {id, code}` cuando está compartida.
+
+### Despensa, sobras y presupuesto
+- `needFromPlan(from, to)` = `aggregate()` menos la despensa: no pide lo que está en la despensa con `qty` 0; resta la cantidad si coincide nombre y unidad; si queda cubierto lo omite y si no marca `have`.
+- Al marcar un platillo como hecho (`onDishDone` → `logCooked`): `useFromPantry` descuenta (escalado por porciones; no si es `lo`), se añade a `history` y, si las porciones superan `profile.servings`, se crean sobras. Al desmarcar se devuelve lo usado y se borran el historial y las sobras de ese platillo.
+- `weekSpend()` = `prefs.spent[semana]` + artículos marcados esa semana con `price`.
+- `recipeScore(r)` = favorita (+1,5) + (promedio − 3) × 0,75; entra en la puntuación de «Completar con el recetario» junto con los días desde la última vez.
+- Resumen semanal: `weekNutrition()` promedia los días con datos y compara contra la semana anterior (tendencia ±3 %); consejos para nutrientes por debajo del 85 % de la meta.
+
+### Sincronización del campo `extra`
+- Columna `user_settings.extra jsonb`; la entidad de ajustes (`s`) pasa a ser `{profile, dayTips, extra: {pantry, prices, history, leftovers, prefs}}` y se sube con el mismo `upsert`. `extraOf()` normaliza lo remoto para que la huella coincida con la local.
+- Si los ajustes cambiaron en ambos lados, o es la primera sincronización del dispositivo, se aplica `mergeSettings(local, remoto, fresh)` en lugar de «gana lo local»:
+  - `history`: unión por `id`, gana lo local, ordenado por `at`. `prices` y `dayTips`: unión, gana lo local.
+  - `pantry`: en la primera sincronización, unión por `pantryKey` (gana lo local); después se conserva lo local, para que los descuentos y borrados no «resuciten».
+  - `leftovers`: unión por `id` solo en la primera sincronización; después, lo local.
+  - `prefs`: en la primera sincronización gana lo remoto sobre lo local; después gana lo local.
+  - `profile`: en la primera sincronización gana el remoto; después el local.
+
+### Listas compartidas (`shared_lists`)
+Tablas `shared_lists {id, code único, owner, name, data jsonb {name, items, dels}, version, updated_at}` y `shared_list_members {list_id, user_id}`. RLS: miembros leen y actualizan (vía `is_list_member`, `security definer`); el dueño inserta y elimina; cada miembro puede borrar su membresía. Un trigger añade al dueño como miembro; la RPC `join_shared_list(p_code)` añade a quien llama y devuelve la lista. El código son 6 caracteres de un alfabeto sin ambiguos (sin I, L, O, 0, 1), con reintento si choca. Migración: `supabase/migrations/20261120000000_extras_and_shared_lists.sql`.
+
+Algoritmo (`Shared` en `extras.js`; metadatos locales por lista en `localStorage` `planner.shares`: `{v, snap, name}`):
+1. **Snapshot**: `snap` guarda, por artículo, su forma canónica (sin el sello `u`) tal como estaba en la última sincronización con la nube.
+2. **Delta local**: artículos cuya forma difiere del snapshot (`changed`, con `u = ahora`), artículos del snapshot que ya no existen (`dels`) y el nombre si cambió.
+3. **Empujar** (`push`, 600 ms tras guardar): lee la fila remota, la combina con `mergeShared(remoto, delta)` y actualiza con `update … eq('version', row.version)` y `version + 1`. Si otro cambió antes (0 filas), reintenta hasta 5 veces. Tras tener éxito reaplica el resultado y renueva el snapshot.
+4. **Combinar** (`mergeShared`): cada artículo lleva `u` (última modificación); gana el de `u` mayor. Los borrados quedan como lápidas en `data.dels[id] = momento`; un artículo con `u` ≤ lápida se descarta, y las lápidas de más de 30 días se limpian.
+5. **Recibir**: Realtime `postgres_changes` (UPDATE y DELETE sobre la fila, filtro `id=eq.<id>`); además `pull` al abrir y al volver la app a primer plano. `onRemote` ignora versiones ya vistas, combina con el delta local pendiente, actualiza el snapshot con lo remoto (lo no subido sigue pendiente) y, si había cambios locales, los empuja. Si la fila desaparece, la lista deja de estar compartida.
+6. **Dejar de compartir**: el dueño borra la fila; los demás borran su membresía. La lista queda en el dispositivo sin `share`. El campo `share` de la lista también viaja en la sincronización personal (`shopping_lists.data`).
+
+### Recordatorios
+`upcomingReminders(3)` calcula, para cada platillo pendiente (no `lo`) de los próximos días:
+- `cook`: a la hora de la comida menos (tiempo total de la receta o 5 min) menos 10 min.
+- `defrost`: la noche anterior a la hora `defrostAt` (21:00 por defecto) si algún ingrediente es del pasillo «Carnes y pescados».
+En Android `Reminders.sync()` cancela las notificaciones propias (`extra.kind = 'rem'`; las de temporizador no se tocan) y programa hasta 40 futuras en el canal `reminders` con `allowWhileIdle`; se repite tras cada guardado. En PC/web `Reminders.tick()` dispara una `Notification` (si hay permiso) y un aviso en la app, una sola vez por clave (`planner.remFired`, se limpia a los 3 días, ventana de 15 min). «Hoy» muestra los recordatorios activos.
+
+### Modo cocina
+Tamaño de letra `--ck-fs` entre 0,8 y 1,6 (pasos de 0,15, `planner.cookFont`). Toque en el 30 % izquierdo retrocede, el resto avanza. Lectura con `@capacitor-community/text-to-speech` o `speechSynthesis`; órdenes con `@capacitor-community/speech-recognition` (reinicia la escucha al terminar) o la API web. Órdenes: siguiente, atrás, repite, temporizador; se ignoran mientras se lee en voz alta. Android: permiso `RECORD_AUDIO` y `<queries>` para `RecognitionService` y `TTS_SERVICE`.
+
+### Importar desde enlace o foto
+- Enlace: la app llama a la función Edge `import-recipe` (`POST {url}`). Extrae schema.org `Recipe` de los bloques JSON-LD (incluye `@graph`, `mainEntity` y listas) y devuelve `{recipe}` normalizada (tiempos ISO 8601 a minutos, pasos de `HowToStep`/`HowToSection`, nutrición). La app convierte cada línea de ingrediente a `{name, qty, unit}` (fracciones y alias de unidades), detecta temporizadores en los pasos, adivina la categoría y abre el resultado como borrador en el editor. Sin JSON-LD responde `{error: "no_recipe", title, text, url}` y la app ofrece copiar un prompt con el texto (hasta 7000 caracteres) para la IA.
+- Foto: prompt de IA con las instrucciones de transcripción; la persona adjunta la foto en su IA y pega la respuesta JSON.
+- Protecciones SSRF de la función: solo `http(s)`; se bloquean `localhost`, `.local`, `.internal`, IPv6 literales y rangos privados o reservados IPv4 (0/8, 10/8, 100.64/10, 127/8, 169.254/16, 172.16/12, 192.168/16, multicast y superiores); el nombre se resuelve por DNS (registros A) y se rechaza si alguna IP es privada; las redirecciones se siguen a mano (máx. 5) y cada salto repite todas las comprobaciones; tope de 3 MB de descarga y 12 s de tiempo límite por petición.
