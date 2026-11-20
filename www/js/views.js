@@ -7,7 +7,7 @@ function appBar(title, sub, actions = '', opts = {}) {
   return `<header class="appbar${opts.cls ? ' ' + opts.cls : ''}">
     ${opts.back ? `<button class="btn icon ghost ab-back" data-act="nav" data-view="${opts.back}" aria-label="Volver">${ic('left')}</button>` : ''}
     <div class="ab-t">${sub ? `<p class="ab-sub">${sub}</p>` : ''}<h1>${title}</h1></div>
-    <div class="ab-a">${actions}${opts.noGear ? '' : gearBtn()}</div></header>`;
+    <div class="ab-a">${actions}${syncBadge()}${opts.noGear ? '' : gearBtn()}</div></header>`;
 }
 const scaled = (i, f) => `${i.qty ? `<b>${fmtQty(i.qty * f)}${i.unit ? ' ' + esc(i.unit) : ''}</b> ` : ''}${esc(i.name)}`;
 const metaSpans = arr => `<span class="meta-row">${arr.filter(Boolean).map(x => `<span>${x}</span>`).join('')}</span>`;
@@ -24,7 +24,7 @@ function tiCard(date, it) {
     <div class="ti-card">
       <button class="ti-open" data-act="itemSheet" data-date="${date}" data-id="${it.id}" aria-label="Opciones de ${esc(r.name)}"></button>
       ${plate(r, 'sm')}
-      <div class="ti-txt"><b>${esc(r.name)}</b>${metaSpans([`${sv} porc.`, totalMin(r) ? fmtMin(totalMin(r)) : '', hasNutr(r) ? `${fmtNum(r.nutrition.kcal)} kcal` : ''])}</div>
+      <div class="ti-txt"><b>${esc(r.name)}</b>${metaSpans([it.lo ? '<span class="lo-tag">Sobras</span>' : '', `${sv} porc.`, !it.lo && totalMin(r) ? fmtMin(totalMin(r)) : '', hasNutr(r) ? `${fmtNum(r.nutrition.kcal)} kcal` : ''])}</div>
       <button class="ti-check" data-act="toggleDoneBtn" data-date="${date}" data-id="${it.id}" aria-pressed="${it.done}" aria-label="${it.done ? 'Marcar como pendiente' : 'Marcar como hecho'}">${ic('check')}</button>
       <button class="ti-cook" data-act="cookItem" data-date="${date}" data-id="${it.id}" aria-label="Cocinar ${esc(r.name)}">${ic('play', 'fill')}</button>
     </div></div>`;
@@ -115,8 +115,9 @@ function viewToday() {
   const pending = S.lists.reduce((a, l) => a + l.items.filter(i => !i.checked).length, 0);
   return `${appBar(greet, esc(longDate(t)), `<button class="btn icon ghost" data-act="timerSheet" aria-label="Temporizadores">${ic('timer')}</button>`)}
   <div id="upd-banner-host">${updateBanner()}</div>
+  ${remBanner()}
   <div class="today-grid">
-    <div class="tg-main">${nextHero()}${nutriCard(t)}</div>
+    <div class="tg-main">${nextHero()}${nutriCard(t)}${leftoversCard()}</div>
     <section class="tg-day"><div class="sec-h"><h2>Tu día</h2><span class="muted">${items.length ? `${done} de ${items.length} hechos` : ''}</span></div>${dayTimeline(t)}
       ${pending ? `<button class="shortcut" data-act="nav" data-view="shop">${ic('cart')}<span><b>${pending} ${pending === 1 ? 'cosa' : 'cosas'} por comprar</b><span>En tus listas de compras</span></span>${ic('right')}</button>` : ''}</section>
   </div>`;
@@ -159,7 +160,7 @@ function viewWeek() {
   const days = weekDays(ui.weekStart), t = todayStr();
   if (!days.includes(ui.day)) ui.day = days.includes(t) ? t : days[0];
   const moving = ui.moving && getRecipe(findItem(ui.moving.date, ui.moving.id)?.recipeId);
-  return `${appBar(weekTitle(days), 'Semana')}
+  return `${appBar(weekTitle(days), 'Semana', `<button class="btn ghost" data-act="weekSummary" aria-label="Resumen nutricional de la semana">${ic('leaf')}<span class="d-inline">Resumen</span></button>`)}
   ${planTools('week')}
   ${moving ? `<div class="move-banner" role="status">${ic('move')}<span>Moviendo <b>${esc(moving.name)}</b>. Toca la casilla de destino.</span><button class="btn sm" data-act="cancelMove">Cancelar</button></div>` : ''}
   <div class="week-layout">
@@ -184,7 +185,7 @@ function viewMonth() {
     cells += `<button class="mday${date === t ? ' today' : ''}${date === ui.day ? ' sel' : ''}${date < t ? ' past' : ''}" data-act="selectDay" data-date="${date}" aria-label="${esc(longDate(date))}: ${items.length} platillos" aria-pressed="${date === ui.day}">
       <span class="n">${d}</span><span class="pips">${items.slice(0, 5).map(i => `<i class="pip c-${i.meal}"></i>`).join('')}</span>${names}${items.length > 3 ? `<span class="nm more">y ${items.length - 3} más</span>` : ''}</button>`;
   }
-  return `${appBar(esc(monthName(m)), total ? `${total} ${total === 1 ? 'platillo planificado' : 'platillos planificados'}` : 'Mes sin planificar')}
+  return `${appBar(esc(monthName(m)), total ? `${total} ${total === 1 ? 'platillo planificado' : 'platillos planificados'}` : 'Mes sin planificar', `<button class="btn ghost" data-act="weekSummary" aria-label="Resumen nutricional de la semana">${ic('leaf')}<span class="d-inline">Resumen de la semana</span></button>`)}
   ${planTools('month')}
   <div class="week-layout">
     <div><div class="mcal">${['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map(x => `<div class="dow">${x}</div>`).join('')}${cells}</div>
@@ -216,7 +217,7 @@ function tile(r) {
     ${ed ? `<span class="selbox" aria-hidden="true">${sel ? ic('check') : ''}</span>` : `<button class="tile-fav${r.fav ? ' on' : ''}" data-act="toggleFav" data-id="${r.id}" aria-label="${r.fav ? 'Quitar de favoritas' : 'Marcar como favorita'}" aria-pressed="${r.fav}">${ic('star', r.fav ? 'fill' : '')}</button>`}
     ${plate(r, 'tile-plate')}
     <b class="tile-name">${esc(r.name)}</b>
-    ${metaSpans([totalMin(r) ? fmtMin(totalMin(r)) : '', DIFF[r.difficulty], hl])}
+    ${metaSpans([(st => st.avg ? `★ ${fmtNum(st.avg, 1)}` : '')(recipeStats(r.id)), totalMin(r) ? fmtMin(totalMin(r)) : '', DIFF[r.difficulty], hl])}
     ${ed ? '' : `<button class="tile-plan" data-act="planDlg" data-recipe="${r.id}" aria-label="Añadir ${esc(r.name)} a un día">${ic('calPlus')}</button>`}
   </article>`;
 }
@@ -238,7 +239,7 @@ function bookGrid() {
 }
 function viewBook() {
   return `${appBar('Recetario', `${S.recipes.length} ${S.recipes.length === 1 ? 'receta' : 'recetas'}`, `
-    <button class="btn icon ghost" data-act="importDlg" aria-label="Importar recetas con IA">${ic('spark')}</button>
+    <button class="btn icon ghost" data-act="importMenu" aria-label="Importar recetas: enlace, foto o IA">${ic('down')}</button>
     <button class="btn${ui.bookEdit ? ' primary' : ' ghost'}" data-act="bookEdit" aria-pressed="${ui.bookEdit}">${ui.bookEdit ? ic('check') + 'Terminar' : 'Organizar'}</button>
     ${ui.bookEdit ? '' : `<button class="btn primary d-only" data-act="newRecipe">${ic('plus')}Nueva receta</button>`}`)}
   <label class="search-name" for="q">Buscar recetas</label>
@@ -293,6 +294,7 @@ function viewRecipe() {
   </div>
   <section class="upcoming-s"><h2>En tu plan</h2>
     ${upcoming.length ? `<ul class="upcoming">${upcoming.slice(0, 8).map(({ d, i }) => `<li><button class="link" data-act="openDay" data-date="${d}"><i class="pip c-${i.meal}"></i>${esc(relDay(d))}, ${CATS[i.meal].name.toLowerCase()} a las ${esc(i.time)}</button></li>`).join('')}</ul>` : '<p class="muted">No está en ningún día próximo.</p>'}</section>
+  ${historySection(r)}
   <div class="actbar"><button class="btn lg" data-act="planDlg" data-recipe="${r.id}">${ic('calPlus')}Añadir a un día</button><button class="btn primary lg" data-act="cookRecipe" data-id="${r.id}">${ic('play', 'fill')}Cocinar</button></div>`;
 }
 
@@ -363,17 +365,19 @@ function refreshEditorRows() { const rows = editorRows(); $('#ings').innerHTML =
 /* ───────── Compras ───────── */
 function viewShop() {
   const lists = S.lists;
+  if (ui.shopTab === 'pantry') return `${appBar('Compras', 'Despensa')}${shopTabs()}${viewPantry()}`;
   if (!lists.length) {
-    return `${appBar('Compras', 'Listas de compras')}
+    return `${appBar('Compras', 'Listas de compras')}${shopTabs()}
     <div class="empty">${ic('cart', 'big')}<h3>Aún no tienes listas</h3><p>Lo más rápido: una lista con los ingredientes de lo que planificaste esta semana, ya sumados. Luego la editas a tu gusto.</p>
       <div class="row center"><button class="btn primary" data-act="quickWeekList">${ic('cal')}Lista de esta semana</button><button class="btn" data-act="newList">${ic('plus')}Otra lista</button></div></div>`;
   }
   return `${appBar('Compras', `${lists.length} ${lists.length === 1 ? 'lista' : 'listas'}`, `<button class="btn primary" data-act="newList">${ic('plus')}Nueva lista</button>`)}
+  ${shopTabs()}${budgetCard()}
   <div class="lists-grid">${lists.map(l => {
     const { total, got } = listStats(l), done = total && got === total;
     return `<article class="lcard${done ? ' done' : ''}">
       <button class="tile-open" data-act="openList" data-id="${l.id}" aria-label="Abrir ${esc(l.name)}"></button>
-      <div class="lc-top"><div><h3>${esc(l.name)}</h3><p class="muted">${l.from ? `Del plan, ${esc(fmtRange(l.from, l.to))}` : 'Lista libre'}</p></div><span class="lc-count"><b>${got}</b>/${total}</span></div>
+      <div class="lc-top"><div><h3>${esc(l.name)}${l.share ? ' <span class="live-chip">En vivo</span>' : ''}</h3><p class="muted">${l.from ? `Del plan, ${esc(fmtRange(l.from, l.to))}` : 'Lista libre'}${listCost(l) ? `, ${money(listCost(l))}` : ''}</p></div><span class="lc-count"><b>${got}</b>/${total}</span></div>
       <div class="pbar"><b style="width:${total ? (got / total) * 100 : 0}%"></b></div>
       <p class="lprev">${esc(l.items.filter(i => !i.checked).slice(0, 6).map(i => i.name).join(', ')) || (done ? 'Todo comprado' : 'Sin artículos')}</p>
       <div class="row lc-a"><button class="btn sm ghost" data-act="listDup" data-id="${l.id}">${ic('copy')}Duplicar</button><button class="btn sm ghost danger" data-act="listDelete" data-id="${l.id}">${ic('trash')}Eliminar</button></div>
@@ -387,14 +391,15 @@ function itemRow(i) {
       <label class="ie-name">Artículo<input id="ie-name" value="${esc(i.name)}"></label>
       <label>Cantidad<input id="ie-qty" inputmode="decimal" value="${i.qty || ''}" placeholder="0"></label>
       <label>Unidad<input id="ie-unit" value="${esc(i.unit)}" list="units"></label>
+      <label>Precio${i.est ? ' (estimado)' : ''}<input id="ie-price" inputmode="decimal" value="${i.price || ''}" placeholder="${esc(S.prefs.currency || '$')}"></label>
       <label class="ie-aisle">Pasillo${aisleSelect('ie-aisle', i.aisle)}</label></div>
       <div class="row"><button class="btn primary sm" data-act="itemSave" data-id="${i.id}">${ic('check')}Guardar</button><button class="btn sm" data-act="itemCancel">Cancelar</button><button class="btn ghost danger sm" data-act="itemDel" data-id="${i.id}">${ic('trash')}Eliminar</button></div></li>`;
   }
-  const src = i.recipes && i.recipes.length ? i.recipes.join(', ') : i.src === 'plan' ? '' : 'Añadido a mano';
+  const src = [i.recipes && i.recipes.length ? i.recipes.join(', ') : i.src === 'plan' ? '' : 'Añadido a mano', i.have ? `ya tienes ${i.have}` : ''].filter(Boolean).join('; ');
   return `<li class="it${i.checked ? ' chk' : ''}" data-swipe="${i.id}">
     <label class="it-l"><input type="checkbox" class="sr" ${i.checked ? 'checked' : ''} data-chg="itemCheck" data-id="${i.id}"><span class="cb">${ic('check')}</span>
       <span class="it-t">${esc(i.name)}${src ? `<small>${esc(src)}${i.edited ? ', editado' : ''}</small>` : ''}</span></label>
-    <span class="it-q">${i.qty > 0 ? `${fmtQty(i.qty)}${i.unit ? ' ' + esc(i.unit) : ''}` : ''}</span>
+    <span class="it-q">${i.qty > 0 ? `${fmtQty(i.qty)}${i.unit ? ' ' + esc(i.unit) : ''}` : ''}${i.price ? `<small>${i.est ? '≈ ' : ''}${money(i.price)}</small>` : ''}</span>
     <button class="btn icon ghost sm" data-act="itemEdit" data-id="${i.id}" aria-label="Editar ${esc(i.name)}">${ic('edit')}</button></li>`;
 }
 function viewList() {
@@ -406,9 +411,10 @@ function viewList() {
   const pending = l.items.filter(i => !i.checked && (ui.aisle === 'all' || i.aisle === ui.aisle)), cart = l.items.filter(i => i.checked);
   const groups = {};
   for (const i of pending) (groups[i.aisle] = groups[i.aisle] || []).push(i);
-  return `${appBar(`<button class="title-btn" data-act="listRename" data-id="${l.id}" aria-label="Renombrar lista">${esc(l.name)}${ic('edit')}</button>`, l.from ? `Del plan, ${esc(fmtRange(l.from, l.to))}` : 'Lista libre',
+  return `${appBar(`<button class="title-btn" data-act="listRename" data-id="${l.id}" aria-label="Renombrar lista">${esc(l.name)}${ic('edit')}</button>`, `${l.share ? '<span class="live-chip">En vivo</span> ' : ''}${l.from ? `Del plan, ${esc(fmtRange(l.from, l.to))}` : 'Lista libre'}`,
     `${l.from ? `<button class="btn icon ghost" data-act="listSync" data-id="${l.id}" aria-label="Actualizar desde el plan" title="Actualizar desde el plan">${ic('spark')}</button>` : ''}<button class="btn icon ghost" data-act="listShare" data-id="${l.id}" aria-label="Compartir lista">${ic('share')}</button>`, { back: 'shop', noGear: true })}
   <div class="lh-prog"><div class="pbar big"><b style="width:${total ? (got / total) * 100 : 0}%"></b></div><span><b>${got}</b>/${total}</span></div>
+  ${listMoney(l)}
   ${present.length > 1 ? `<div class="chips scroll-x">${['all', ...present].map(a => `<button class="chip${ui.aisle === a ? ' on' : ''}" data-act="aisleFilter" data-a="${esc(a)}" aria-pressed="${ui.aisle === a}">${a === 'all' ? 'Todo' : AISLE_SHORT[a]}</button>`).join('')}</div>` : ''}
   <form class="add-item" data-form="item">
     <label class="ai-name">Artículo<input id="ni-name" placeholder="Ej. papel de cocina" autocomplete="off"></label>
@@ -421,7 +427,7 @@ function viewList() {
     || (total ? `<div class="empty small">${ic('check', 'big')}<h3>${got === total ? 'Todo en el carrito' : 'Nada en este pasillo'}</h3></div>` : `<div class="empty small"><p>La lista está vacía. Añade artículos arriba${l.from ? ' o actualízala desde el plan' : ''}.</p></div>`)}
   ${cart.length ? `<section class="aisle cart"><h3>En el carrito<span>${cart.length}</span></h3><ul class="items">${cart.map(itemRow).join('')}</ul></section>` : ''}
   <p class="hint">Desliza un artículo hacia la derecha para marcarlo como comprado.</p>
-  <div class="row list-tools"><button class="btn sm" data-act="listUncheck" data-id="${l.id}">Desmarcar todo</button><button class="btn sm" data-act="listClearChecked" data-id="${l.id}">Quitar lo comprado</button>
+  <div class="row list-tools"><button class="btn sm" data-act="listToPantry" data-id="${l.id}">${ic('leaf')}Guardar lo comprado en la despensa</button><button class="btn sm" data-act="listUncheck" data-id="${l.id}">Desmarcar todo</button><button class="btn sm" data-act="listClearChecked" data-id="${l.id}">Quitar lo comprado</button>
     <button class="btn sm" data-act="listDup" data-id="${l.id}">${ic('copy')}Duplicar</button><button class="btn ghost danger sm" data-act="listDelete" data-id="${l.id}">${ic('trash')}Eliminar lista</button></div>
   <datalist id="units">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>`;
 }
@@ -452,7 +458,8 @@ function viewCook() {
   const top = `<header class="ck-top"><button class="ck-btn" data-act="cookExit" aria-label="Salir de cocinar">${ic('x')}</button>
     <div class="ck-title"><small>Cocinando</small><b>${esc(r.name)}</b></div>
     <span class="stepper dark"><button class="ck-btn sm" data-act="cookServ" data-n="-1" aria-label="Menos porciones">${ic('minus')}</button><b>${c.servings} porc.</b><button class="ck-btn sm" data-act="cookServ" data-n="1" aria-label="Más porciones">${ic('plus')}</button></span></header>
-  ${n ? `<div class="ck-prog">${r.steps.map((s, k) => `<button class="${k < c.step ? 'd' : k === c.step ? 'n' : ''}" data-act="cookGo" data-n="${k}" aria-label="Ir al paso ${k + 1}"></button>`).join('')}</div>` : ''}`;
+  ${n ? `<div class="ck-prog">${r.steps.map((s, k) => `<button class="${k < c.step ? 'd' : k === c.step ? 'n' : ''}" data-act="cookGo" data-n="${k}" aria-label="Ir al paso ${k + 1}"></button>`).join('')}</div>` : ''}
+  ${n ? cookOptions() : ''}`;
   let main;
   if (!n) main = `<div class="ck-step"><p class="steptext">Esta receta no tiene pasos.</p><button class="btn" data-act="editRecipe" data-id="${r.id}">Añadir pasos</button></div>`;
   else if (c.step >= n) main = `<div class="ck-step finish">${plate(r, 'hero-plate')}<p class="steptext">Listo, a la mesa.</p><p class="ck-muted">Terminaste ${esc(r.name)}.</p></div>`;
@@ -460,9 +467,10 @@ function viewCook() {
     const label = cookLabel(r, c.step), sugg = !step.timer ? detectMin(step.text) : 0, mins = step.timer || sugg;
     const ings = stepIngredients(r, step.text);
     main = `<div class="ck-step" data-swipe-step="1">
-      <small class="ck-n">Paso ${c.step + 1} de ${n}</small>
+      <div class="ck-tap" data-act="cookTap"><small class="ck-n">Paso ${c.step + 1} de ${n}</small>
       <p class="steptext">${esc(step.text)}</p>
       ${ings.length ? `<div class="ck-ing">${ings.map(i => `<span>${scaled(i, f)}</span>`).join('')}</div>` : ''}
+      <p class="ck-taphint">Toca el texto para avanzar; a la izquierda, para volver.</p></div>
       <div class="ring-host ck-ring" data-only="${esc(label)}" data-onchange="cook"></div>
       <div class="ck-start">
         ${mins ? `<button class="ck-timer-btn" data-act="startTimer" data-min="${mins}" data-label="${esc(label)}">${ic('timer')}<span><b>${fmtClock(mins * 60)}</b>${step.timer ? 'Iniciar temporizador del paso' : 'El paso menciona este tiempo: iniciar'}</span></button>` : ''}
@@ -538,6 +546,8 @@ function viewMore() {
       <input id="backupFile" type="file" accept="application/json,.json" hidden></section>
     <section class="panel"><h2>${ic('bell')}Avisos del temporizador</h2><p>${IS_NATIVE ? 'La app usa alarmas de Android: suenan aunque la cierres. Revisa que tenga permiso de notificaciones.' : 'Permite notificaciones para que el temporizador avise aunque cambies de pestaña.'}</p>
       <button class="btn" data-act="askNotif">Activar notificaciones</button></section>
+    ${remPanel()}
+    <section class="panel"><h2>${ic('user')}Bienvenida</h2><p>Vuelve a ver los tres pasos iniciales: perfil, metas y cómo empezar.</p><button class="btn" data-act="onboard">Ver la bienvenida</button></section>
     <section class="panel"><h2>${ic('book')}Recetas de ejemplo</h2><p>12 recetas variadas con datos nutricionales. No duplica las que ya tengas.</p><button class="btn" data-act="loadSamples">Cargar ejemplos</button></section>
     <section class="panel"><h2>${ic('down')}Actualizaciones</h2><p>Versión instalada: <b>${esc(APP_VERSION.name)}</b>${IS_NATIVE ? ' (Android)' : ''}.</p>
       <p id="upd-status" class="muted">${esc(Updates.statusText())}</p>
@@ -556,6 +566,7 @@ function render() {
   $$('#nav [data-view]').forEach(b => { const on = b.dataset.view === NAV_OF[ui.view]; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
   renderTimers();
   Updates.refresh();
+  Voice.afterRender();
   if (ui.view === 'week') {
     const wrap = $('.wgrid-wrap'), sel = $('.wg-day.sel');
     if (wrap && sel && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = Math.max(0, sel.offsetLeft - 76);

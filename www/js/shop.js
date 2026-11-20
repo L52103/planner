@@ -27,6 +27,7 @@ function aggregate(from, to) {
   for (const [date, items] of Object.entries(S.plan)) {
     if (date < from || date > to) continue;
     for (const it of items) {
+      if (it.lo) continue; // sobras: ya están cocinadas, no se compran
       const r = getRecipe(it.recipeId);
       if (!r) continue;
       const f = (it.servings || r.servings || 1) / (r.servings || 1);
@@ -53,7 +54,7 @@ const getList = id => S.lists.find(l => l.id === id);
 const listStats = l => ({ total: l.items.length, got: l.items.filter(i => i.checked).length });
 const itemLine = i => `${i.qty > 0 ? fmtQty(i.qty) + (i.unit ? ' ' + i.unit : '') + ' ' : ''}${i.name}`;
 function planToItems(from, to) {
-  return aggregate(from, to).map(e => ({ id: uid(), name: e.name, qty: e.qty, unit: e.unit, aisle: e.aisle, checked: false, src: 'plan', pkey: e.key, edited: false, recipes: [...e.from] }));
+  return needFromPlan(from, to).map(e => withPrice({ id: uid(), name: e.name, qty: e.qty, unit: e.unit, aisle: e.aisle, checked: false, src: 'plan', pkey: e.key, edited: false, recipes: [...e.from], ...(e.have ? { have: e.have } : {}) }));
 }
 function createList(name, from, to, fromPlan) {
   const l = { id: uid(), name: name.trim() || 'Lista de compras', createdAt: Date.now(), from: fromPlan ? from : '', to: fromPlan ? to : '', removed: [], items: fromPlan ? planToItems(from, to) : [] };
@@ -64,16 +65,17 @@ function createList(name, from, to, fromPlan) {
 function syncList(l) {
   const res = { added: 0, updated: 0, removed: 0 };
   if (!l.from) return res;
-  const agg = aggregate(l.from, l.to), seen = new Set();
+  const agg = needFromPlan(l.from, l.to), seen = new Set();
   for (const e of agg) {
     seen.add(e.key);
     if ((l.removed || []).includes(e.key)) continue;
     const it = l.items.find(i => i.src === 'plan' && i.pkey === e.key);
     if (it) {
-      if (!it.edited && Math.abs(it.qty - e.qty) > 1e-9) { it.qty = e.qty; res.updated++; }
+      if (!it.edited && Math.abs(it.qty - e.qty) > 1e-9) { it.qty = e.qty; res.updated++; withPrice(it, true); }
       it.recipes = [...e.from];
+      if (e.have) it.have = e.have; else delete it.have;
     } else {
-      l.items.push({ id: uid(), name: e.name, qty: e.qty, unit: e.unit, aisle: e.aisle, checked: false, src: 'plan', pkey: e.key, edited: false, recipes: [...e.from] });
+      l.items.push(withPrice({ id: uid(), name: e.name, qty: e.qty, unit: e.unit, aisle: e.aisle, checked: false, src: 'plan', pkey: e.key, edited: false, recipes: [...e.from], ...(e.have ? { have: e.have } : {}) }));
       res.added++;
     }
   }
@@ -82,6 +84,63 @@ function syncList(l) {
   res.removed = before - l.items.length;
   return res;
 }
+/* ── despensa: lo que ya tienes en casa ── */
+const pantryKey = (name, unit) => fold(name) + '|' + unitKey(unit || '');
+const pantryFind = (name, unit) => S.pantry.find(p => pantryKey(p.name, p.unit) === pantryKey(name, unit)) || S.pantry.find(p => !p.qty && fold(p.name) === fold(name));
+// Lo que falta comprar para el plan, descontando la despensa (qty 0 en la despensa = "siempre hay")
+function needFromPlan(from, to) {
+  const out = [];
+  for (const e of aggregate(from, to)) {
+    const p = pantryFind(e.name, e.unit);
+    if (!p) { out.push(e); continue; }
+    if (!p.qty) continue; // siempre en casa
+    const need = e.qty - p.qty;
+    if (e.qty > 0 && need <= 1e-9) continue;
+    out.push({ ...e, qty: e.qty > 0 ? need : e.qty, have: `${fmtQty(p.qty)}${p.unit ? ' ' + p.unit : ''} en la despensa` });
+  }
+  return out;
+}
+// Al cocinar, se descuenta de la despensa lo que usa la receta
+function useFromPantry(r, servings) {
+  const f = (servings || r.servings) / (r.servings || 1);
+  for (const ing of r.ingredients) {
+    const p = S.pantry.find(x => x.qty > 0 && pantryKey(x.name, x.unit) === pantryKey(ing.name, ing.unit));
+    if (!p || !(ing.qty > 0)) continue;
+    p.qty = Math.max(0, +(p.qty - ing.qty * f).toFixed(3));
+    if (p.qty <= 0) S.pantry = S.pantry.filter(x => x !== p);
+  }
+}
+function addToPantry(name, qty, unit) {
+  const p = S.pantry.find(x => pantryKey(x.name, x.unit) === pantryKey(name, unit));
+  if (p) { if (p.qty || qty) p.qty = +(p.qty + qty).toFixed(3); p.at = Date.now(); return p; }
+  const n = { id: uid(), name: name.trim(), qty, unit: unit || '', at: Date.now() };
+  S.pantry.push(n); return n;
+}
+
+/* ── presupuesto: precios recordados por artículo y unidad ── */
+const priceKey = i => fold(i.name) + '|' + unitKey(i.unit || '');
+// Precio estimado de la línea a partir del último precio unitario pagado
+function withPrice(i, force) {
+  const u = S.prices[priceKey(i)];
+  if (u && (force || !i.price)) { const p = +(i.qty > 0 ? u * i.qty : u).toFixed(2); if (p > 0) { i.price = p; i.est = true; } }
+  return i;
+}
+function rememberPrice(i) { if (i.price > 0) S.prices[priceKey(i)] = +(i.qty > 0 ? i.price / i.qty : i.price).toFixed(4); }
+const money = n => (S.prefs.currency || '$') + (n || 0).toLocaleString('es', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const listCost = l => l.items.reduce((a, i) => a + (i.price || 0), 0);
+function weekSpend(ws = weekStartOf(todayStr())) {
+  const a = parseYmd(ws).getTime(), b = addDays(parseYmd(ws), 7).getTime();
+  return num((S.prefs.spent || {})[ws], 0) + S.lists.reduce((t, l) => t + l.items.reduce((s, i) => s + (i.checked && i.price && i.at >= a && i.at < b ? i.price : 0), 0), 0);
+}
+// Antes de quitar artículos comprados de una lista, su gasto queda registrado en su semana
+function bankSpend(items) {
+  const sp = { ...(S.prefs.spent || {}) };
+  for (const i of items) if (i.checked && i.price && i.at) { const w = weekStartOf(ymd(new Date(i.at))); sp[w] = +(num(sp[w], 0) + i.price).toFixed(2); }
+  const keep = ymd(addDays(new Date(), -7 * 26));
+  for (const k of Object.keys(sp)) if (k < keep) delete sp[k];
+  S.prefs.spent = sp;
+}
+
 function listText(l, onlyPending = true) {
   const groups = {};
   for (const i of l.items) if (!onlyPending || !i.checked) (groups[i.aisle] = groups[i.aisle] || []).push('- ' + itemLine(i));

@@ -22,19 +22,20 @@ const fingerprint = v => { const s = canon(v); let h = 5381; for (let i = 0; i <
 
 /* entidades locales ↔ filas de la base */
 const recipeEntity = r => ({ id: r.id, name: r.name, emoji: r.emoji, category: r.category, difficulty: r.difficulty, description: r.description || '', servings: r.servings, prepMinutes: r.prepMinutes || 0, cookMinutes: r.cookMinutes || 0, tags: r.tags || [], ingredients: (r.ingredients || []).map(i => ({ name: i.name, qty: i.qty || 0, unit: i.unit || '' })), steps: (r.steps || []).map(s => ({ text: s.text, timer: s.timer || 0 })), nutrition: r.nutrition || null, notes: r.notes || '', fav: !!r.fav, createdAt: r.createdAt || 0 });
-const settingsEntity = () => ({ profile: S.profile || null, dayTips: S.dayTips || {} });
+const extraEntity = () => ({ pantry: S.pantry, prices: S.prices, history: S.history, leftovers: S.leftovers, prefs: S.prefs });
+const settingsEntity = () => ({ profile: S.profile || null, dayTips: S.dayTips || {}, extra: extraEntity() });
 function localEntities() {
   const m = new Map();
   for (const r of S.recipes) m.set('r:' + r.id, recipeEntity(r));
   for (const [d, items] of Object.entries(S.plan)) m.set('p:' + d, items);
-  for (const l of S.lists) m.set('l:' + l.id, { id: l.id, name: l.name, createdAt: l.createdAt || 0, from: l.from || '', to: l.to || '', removed: l.removed || [], items: l.items });
+  for (const l of S.lists) m.set('l:' + l.id, { id: l.id, name: l.name, createdAt: l.createdAt || 0, from: l.from || '', to: l.to || '', removed: l.removed || [], items: l.items, share: l.share || null });
   m.set('s', settingsEntity());
   return m;
 }
 const toRow = {
   r: e => ({ id: e.id, name: e.name, emoji: e.emoji, category: e.category, difficulty: e.difficulty, description: e.description, servings: e.servings, prep_minutes: e.prepMinutes, cook_minutes: e.cookMinutes, tags: e.tags, ingredients: e.ingredients, steps: e.steps, nutrition: e.nutrition, notes: e.notes, fav: e.fav, created_at: new Date(e.createdAt || Date.now()).toISOString(), deleted: false }),
   p: (e, day) => ({ day, items: e, deleted: false }),
-  l: e => ({ id: e.id, name: e.name, data: { createdAt: e.createdAt, from: e.from, to: e.to, removed: e.removed, items: e.items }, deleted: false }),
+  l: e => ({ id: e.id, name: e.name, data: { createdAt: e.createdAt, from: e.from, to: e.to, removed: e.removed, items: e.items, share: e.share }, deleted: false }),
 };
 // Normaliza lo que viene de la base con las mismas reglas que los datos locales (también filas cargadas a mano)
 const fromRow = {
@@ -43,8 +44,25 @@ const fromRow = {
     return st.recipes[0] ? recipeEntity(st.recipes[0]) : null;
   },
   p: row => normalizeState({ plan: { [row.day]: row.items || [] } }).plan[row.day] || null,
-  l: row => { const d = row.data || {}; const l = normalizeState({ lists: [{ id: row.id, name: row.name, ...d }] }).lists[0]; return l ? { id: l.id, name: l.name, createdAt: d.createdAt || 0, from: l.from || '', to: l.to || '', removed: l.removed || [], items: l.items } : null; },
+  l: row => { const d = row.data || {}; const l = normalizeState({ lists: [{ id: row.id, name: row.name, ...d }] }).lists[0]; return l ? { id: l.id, name: l.name, createdAt: d.createdAt || 0, from: l.from || '', to: l.to || '', removed: l.removed || [], items: l.items, share: l.share || null } : null; },
 };
+// Mismo formato que extraEntity para que la huella coincida
+const extraOf = x => { const n = normalizeExtra(x || {}); return { pantry: n.pantry, prices: n.prices, history: n.history, leftovers: n.leftovers, prefs: n.prefs }; };
+function mergeSettings(loc, rem, fresh) {
+  const byId = (a, b) => { const m = new Map((b || []).map(x => [x.id, x])); for (const x of a || []) m.set(x.id, x); return [...m.values()]; };
+  const le = loc.extra || {}, re = rem.extra || {};
+  const pantry = fresh ? (() => { const m = new Map((re.pantry || []).map(p => [pantryKey(p.name, p.unit), p])); for (const p of le.pantry || []) m.set(pantryKey(p.name, p.unit), p); return [...m.values()]; })() : le.pantry || [];
+  return {
+    profile: fresh ? rem.profile || loc.profile : loc.profile || rem.profile,
+    dayTips: { ...(rem.dayTips || {}), ...(loc.dayTips || {}) },
+    extra: {
+      pantry, prices: { ...(re.prices || {}), ...(le.prices || {}) },
+      history: byId(le.history, re.history).sort((a, b) => a.at - b.at),
+      leftovers: fresh ? byId(le.leftovers, re.leftovers) : le.leftovers || [],
+      prefs: fresh ? { ...(le.prefs || {}), ...(re.prefs || {}) } : { ...(re.prefs || {}), ...(le.prefs || {}) },
+    },
+  };
+}
 function applyEntity(key, e) {
   const kind = key[0], id = key.slice(2);
   if (kind === 'r') {
@@ -60,6 +78,7 @@ function applyEntity(key, e) {
   } else if (key === 's' && e) {
     if (e.profile) S.profile = e.profile;
     S.dayTips = e.dayTips || {};
+    if (e.extra) Object.assign(S, normalizeExtra(e.extra));
   }
 }
 
@@ -151,6 +170,8 @@ const Cloud = {
       let localChanged = false;
       const consider = (key, remote) => {
         const rf = remote ? fingerprint(remote) : null, lf = curFp.get(key) ?? null, bf = base[key] ?? null;
+        // Ajustes (perfil, despensa, historial…): si cambiaron en los dos lados o es la primera vez, se combinan
+        if (key === 's' && remote && lf !== bf && lf !== rf) { applyEntity('s', mergeSettings(cur.get('s'), remote, !bf)); localChanged = true; return; }
         if (lf === bf) { // sin cambios locales: se aplica lo remoto
           if (rf !== lf) { applyEntity(key, remote); localChanged = true; }
           if (rf) base[key] = rf; else delete base[key];
@@ -168,7 +189,7 @@ const Cloud = {
       {
         const { data, error } = await this.client.from('user_settings').select('*').maybeSingle();
         if (error) throw error;
-        if (data && data.updated_at !== st.lastPull.s) { consider('s', { profile: data.profile || null, dayTips: data.day_tips || {} }); st.lastPull.s = data.updated_at; }
+        if (data && data.updated_at !== st.lastPull.s) { consider('s', { profile: data.profile || null, dayTips: data.day_tips || {}, extra: extraOf(data.extra) }); st.lastPull.s = data.updated_at; }
       }
 
       /* 2. Primera sincronización en este dispositivo: evita recetas duplicadas (mismo nombre y contenido) */
@@ -209,7 +230,7 @@ const Cloud = {
       }
       if (base.s !== curFp.get('s')) {
         const e = cur.get('s');
-        const { error } = await this.client.from('user_settings').upsert({ user_id: this.user.id, profile: e.profile, day_tips: e.dayTips }, { onConflict: 'user_id' });
+        const { error } = await this.client.from('user_settings').upsert({ user_id: this.user.id, profile: e.profile, day_tips: e.dayTips, extra: e.extra }, { onConflict: 'user_id' });
         if (error) throw error;
         base.s = curFp.get('s');
       }
@@ -227,6 +248,7 @@ const Cloud = {
     } finally {
       this.syncing = false;
       this.refreshUI();
+      if (this.status === 'ok' && typeof Shared !== 'undefined') Shared.start();
       if (this.again) { this.again = false; setTimeout(() => this.sync({ quiet: true }), 300); }
     }
   },
@@ -247,8 +269,7 @@ const Cloud = {
   refreshUI() {
     const el = $('#cloud-status');
     if (el) { el.textContent = this.statusText(); el.dataset.state = this.status; }
-    const dot = $('#nav .cloud-dot');
-    if (dot) dot.dataset.state = this.user ? this.status : 'off';
+    if (typeof refreshSyncBadges === 'function') refreshSyncBadges();
     if (ui.view === 'more' && !dlg.open && !document.activeElement?.closest('.cloud-form')) {
       const panel = $('#cloud-panel');
       if (panel && panel.dataset.user !== (this.user?.id || '')) render();

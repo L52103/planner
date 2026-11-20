@@ -1,5 +1,5 @@
 const CACHE = 'planner-v2.4.1';
-const SHELL = ['./', 'index.html', 'style.css', 'fonts.css', 'vendor/supabase.js', 'js/version.js', 'js/core.js', 'js/cloud.js', 'js/updates.js', 'js/shop.js', 'js/timers.js', 'js/views.js', 'js/dialogs.js', 'js/actions.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const SHELL = ['./', 'index.html', 'style.css', 'fonts.css', 'vendor/supabase.js', 'js/version.js', 'js/core.js', 'js/cloud.js', 'js/updates.js', 'js/shop.js', 'js/timers.js', 'js/views.js', 'js/dialogs.js', 'js/extras.js', 'js/actions.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

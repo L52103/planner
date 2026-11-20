@@ -306,9 +306,9 @@ function buildPlan(o) {
       const since = r => last.has(r.id) ? idx - last.get(r.id) : 9999;
       const fresh = c.filter(r => since(r) > o.gap);
       const choices = fresh.length ? fresh : c;
-      const best = Math.max(...choices.map(since));
-      const top = choices.filter(r => since(r) === best);
-      const r = top[Math.floor(Math.random() * top.length)];
+      // Lo menos repetido primero; entre parecidos, favoritas y mejor valoradas (con algo de azar)
+      const score = r => Math.min(since(r), 14) / 14 * 3 + recipeScore(r) + Math.random() * .8;
+      const r = choices.map(x => [x, score(x)]).sort((a, b) => b[1] - a[1])[0][0];
       last.set(r.id, idx);
       out.push({ date: d, meal, recipeId: r.id });
     }

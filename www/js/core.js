@@ -105,6 +105,8 @@ const IC = {
   move: '<path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   cloud: '<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.5 4.5 4.5 0 0 0 7 18z"/>',
+  speaker: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 
@@ -229,10 +231,11 @@ const Native = {
     try {
       await this.ensureChannel();
       const pend = await LN.getPending();
-      if (pend.notifications.length) await LN.cancel({ notifications: pend.notifications.map(n => ({ id: n.id })) });
+      const mine = pend.notifications.filter(n => !n.extra || n.extra.kind !== 'rem');
+      if (mine.length) await LN.cancel({ notifications: mine.map(n => ({ id: n.id })) });
       const now = Date.now();
       const due = list.filter(t => !t.fired && !t.paused && t.endAt > now + 500);
-      if (due.length) await LN.schedule({ notifications: due.map(t => ({ id: this.nid(t.id), title: t.label, body: 'El temporizador terminó', channelId: 'timers', smallIcon: 'ic_stat_timer', schedule: { at: new Date(t.endAt), allowWhileIdle: true } })) });
+      if (due.length) await LN.schedule({ notifications: due.map(t => ({ id: this.nid(t.id), title: t.label, body: 'El temporizador terminó', channelId: 'timers', smallIcon: 'ic_stat_timer', extra: { kind: 'timer' }, schedule: { at: new Date(t.endAt), allowWhileIdle: true } })) });
     } catch {}
   },
   async saveFile(name, text) {
@@ -242,7 +245,7 @@ const Native = {
 };
 
 /* ───────── estado ───────── */
-const emptyState = () => ({ version: 3, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null, dayTips: {} });
+const emptyState = () => ({ version: 4, updatedAt: 0, recipes: [], plan: {}, lists: [], profile: null, dayTips: {}, pantry: [], prices: {}, history: [], leftovers: [], prefs: {} });
 let S = emptyState();
 
 function normalizeState(d) {
@@ -263,7 +266,7 @@ function normalizeState(d) {
       if (!validDate(date) || !Array.isArray(items)) continue;
       const list = items.filter(i => i && i.recipeId).map(i => {
         const time = validTime(i.time) ? i.time : '13:00';
-        return { id: i.id || uid(), recipeId: i.recipeId, time, meal: MEALS.includes(i.meal) ? i.meal : mealFromTime(time), servings: Math.round(num(i.servings, 0)) || 0, done: !!i.done };
+        return { id: i.id || uid(), recipeId: i.recipeId, time, meal: MEALS.includes(i.meal) ? i.meal : mealFromTime(time), servings: Math.round(num(i.servings, 0)) || 0, done: !!i.done, ...(i.lo ? { lo: true } : {}) };
       });
       if (list.length) s.plan[date] = list;
     }
@@ -272,6 +275,7 @@ function normalizeState(d) {
     id: i.id || uid(), name: String(i.name || '').trim(), qty: num(i.qty, 0), unit: String(i.unit || '').trim(),
     aisle: AISLE_NAMES.includes(i.aisle) ? i.aisle : aisleOf(i.name || ''), checked: !!i.checked,
     src: i.src === 'plan' ? 'plan' : 'manual', pkey: i.pkey || '', edited: !!i.edited, recipes: Array.isArray(i.recipes) ? i.recipes.map(String) : [],
+    ...(num(i.price, 0) > 0 ? { price: num(i.price, 0) } : {}), ...(i.at ? { at: Number(i.at) || 0 } : {}), ...(i.have ? { have: String(i.have) } : {}),
   });
   if (Array.isArray(d.lists)) {
     s.lists = d.lists.filter(l => l && typeof l === 'object').map(l => ({
@@ -279,15 +283,27 @@ function normalizeState(d) {
       from: validDate(l.from) ? l.from : '', to: validDate(l.to) ? l.to : '',
       removed: Array.isArray(l.removed) ? l.removed.map(String) : [],
       items: Array.isArray(l.items) ? l.items.filter(i => i && i.name).map(normItem) : [],
+      ...(l.share && l.share.id ? { share: { id: String(l.share.id), code: String(l.share.code || '') } } : {}),
     }));
   } else if (d.shop && Array.isArray(d.shop.extra) && d.shop.extra.length) {
     s.lists = [{ id: uid(), name: 'Mi lista', createdAt: Date.now(), from: '', to: '', removed: [], items: d.shop.extra.filter(e => e && e.name).map(e => normItem({ name: e.name, checked: e.checked })) }];
   }
   if (d.profile && typeof d.profile === 'object') s.profile = { ...d.profile };
   if (d.dayTips && typeof d.dayTips === 'object') for (const [k, v] of Object.entries(d.dayTips)) if (validDate(k) && v) s.dayTips[k] = String(v).slice(0, 600);
+  Object.assign(s, normalizeExtra(d));
   return s;
 }
-function save() { S.updatedAt = Date.now(); const r = Store.save(S); Cloud.schedule(); return r; }
+// Despensa, precios recordados, historial de cocina, sobras y preferencias
+function normalizeExtra(d) {
+  const o = { pantry: [], prices: {}, history: [], leftovers: [], prefs: {} };
+  if (Array.isArray(d.pantry)) o.pantry = d.pantry.filter(p => p && p.name).map(p => ({ id: p.id || uid(), name: String(p.name).trim(), qty: num(p.qty, 0), unit: String(p.unit || '').trim(), at: Number(p.at) || Date.now() }));
+  if (d.prices && typeof d.prices === 'object') for (const [k, v] of Object.entries(d.prices)) if (num(v, 0) > 0) o.prices[k] = num(v, 0);
+  if (Array.isArray(d.history)) o.history = d.history.filter(h => h && h.recipeId && validDate(h.date)).map(h => ({ id: h.id || uid(), recipeId: String(h.recipeId), date: h.date, rating: Math.max(0, Math.min(5, Math.round(num(h.rating, 0)))), src: h.src ? String(h.src) : '', at: Number(h.at) || Date.now(), ...(Array.isArray(h.used) && h.used.length ? { used: h.used.filter(u => u && u.name).map(u => ({ name: String(u.name), unit: String(u.unit || ''), qty: num(u.qty, 0) })) } : {}) })).slice(-500);
+  if (Array.isArray(d.leftovers)) o.leftovers = d.leftovers.filter(l => l && l.recipeId && validDate(l.date) && num(l.portions, 0) > 0).map(l => ({ id: l.id || uid(), recipeId: String(l.recipeId), portions: Math.round(num(l.portions, 1)), date: l.date, until: validDate(l.until) ? l.until : ymd(addDays(parseYmd(l.date), 3)), src: l.src ? String(l.src) : '' }));
+  if (d.prefs && typeof d.prefs === 'object') o.prefs = { ...d.prefs };
+  return o;
+}
+function save() { S.updatedAt = Date.now(); const r = Store.save(S); Cloud.schedule(); if (typeof afterSave === 'function') afterSave(); return r; }
 
 const getRecipe = id => S.recipes.find(r => r.id === id);
 const totalMin = r => (r.prepMinutes || 0) + (r.cookMinutes || 0);

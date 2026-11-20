@@ -126,7 +126,7 @@ const A = {
 
   /* platillo planificado */
   itemSheet: d => itemSheet(d.date, d.id),
-  toggleDoneBtn: async d => { const it = findItem(d.date, d.id); if (!it) return; it.done = !it.done; await save(); refreshSheet(); },
+  toggleDoneBtn: async d => { const it = findItem(d.date, d.id); if (!it) return; it.done = !it.done; const res = onDishDone(d.date, it, it.done); await save(); refreshSheet(); if (it.done) doneToast(res); },
   sheetMeal: async d => { const it = findItem(ui.sheet.date, ui.sheet.id); it.meal = d.meal; it.time = CATS[d.meal].time; await save(); refreshSheet(); },
   sheetServ: async d => { const it = findItem(ui.sheet.date, ui.sheet.id), r = getRecipe(it.recipeId); it.servings = Math.max(1, (it.servings || r?.servings || 1) + Number(d.n)); await save(); refreshSheet(); },
   removeDish: async d => {
@@ -379,6 +379,7 @@ const A = {
     if (!gone.length) return toast('No hay nada marcado');
     await withUndo(`${gone.length} quitados de la lista`, () => {
       l.removed = [...new Set([...(l.removed || []), ...gone.filter(i => i.pkey).map(i => i.pkey)])];
+      bankSpend(gone);
       l.items = l.items.filter(i => !i.checked);
     });
   },
@@ -391,7 +392,7 @@ const A = {
     const l = getList(d.id);
     if (!await confirmDlg({ title: `Eliminar la lista «${esc(l.name)}»`, text: `${l.items.length} ${l.items.length === 1 ? 'artículo' : 'artículos'}. Tus recetas y el plan no cambian.`, ok: 'Eliminar lista' })) return;
     go('shop');
-    await withUndo(`Lista «${l.name}» eliminada`, () => { S.lists = S.lists.filter(x => x.id !== d.id); });
+    await withUndo(`Lista «${l.name}» eliminada`, () => { bankSpend(l.items); S.lists = S.lists.filter(x => x.id !== d.id); });
   },
   itemEdit: d => { ui.editItem = d.id; render(); $('#ie-name')?.focus(); },
   itemCancel: () => { ui.editItem = null; render(); },
@@ -401,6 +402,9 @@ const A = {
     if (!name) return toast('El artículo necesita un nombre');
     const nv = { name, qty: num($('#ie-qty').value, 0), unit: $('#ie-unit').value.trim(), aisle: $('#ie-aisle').value };
     if (nv.name !== i.name || nv.qty !== i.qty || nv.unit !== i.unit || nv.aisle !== i.aisle) { Object.assign(i, nv); i.edited = true; }
+    const price = num($('#ie-price').value, 0);
+    if (price > 0 && (price !== i.price || i.est)) { i.price = price; delete i.est; rememberPrice(i); }
+    else if (!price) { delete i.price; delete i.est; }
     ui.editItem = null; await save(); render(); toast('Artículo guardado');
   },
   itemDel: async d => {
@@ -418,8 +422,16 @@ const A = {
   cookPrev: () => { ui.cook.step = Math.max(0, ui.cook.step - 1); render(); window.scrollTo(0, 0); },
   cookNext: () => { const r = getRecipe(ui.cook.recipeId); ui.cook.step = Math.min(r.steps.length, ui.cook.step + 1); render(); window.scrollTo(0, 0); },
   cookServ: d => { ui.cook.servings = Math.max(1, ui.cook.servings + Number(d.n)); render(); },
-  cookFinish: async () => { const ref = ui.cook.ref; if (ref) { const it = findItem(ref.date, ref.id); if (it) { it.done = true; await save(); } } A.cookExit(); toast('¡Buen provecho!'); },
-  cookExit: () => { const from = ui.cook?.from; ui.cook = null; releaseWake(); go(from && from !== 'cook' && from !== 'editor' ? from : 'today'); },
+  cookFinish: async () => {
+    const c = ui.cook, ref = c.ref, it = ref && findItem(ref.date, ref.id);
+    let res = null;
+    if (it) { if (!it.done) { it.done = true; res = onDishDone(ref.date, it, true); } }
+    else { const r = getRecipe(c.recipeId); if (r) res = logCooked(r, c.servings, todayStr()); }
+    await save(); A.cookExit();
+    if (res && res.h) { rateDlg(res.h.id); if (res.left) toast(`Te sobran ${res.left} ${res.left === 1 ? 'porción' : 'porciones'}: las verás en Hoy`); }
+    else toast('¡Buen provecho!');
+  },
+  cookExit: () => { Voice.stopAll(); const from = ui.cook?.from; ui.cook = null; releaseWake(); go(from && from !== 'cook' && from !== 'editor' ? from : 'today'); },
   startTimer: d => addTimer(Number(d.min), d.label),
   customTimer: d => { const v = num($('#ct-min').value, 0); addTimer(v, d.label); if (v > 0) $('#ct-min').value = ''; },
   timerSheet,
@@ -442,6 +454,7 @@ const A = {
 };
 
 /* ───────── cambios en formularios (data-chg) ───────── */
+/* acciones de la versión 2.5 (extras.js) */
 const C = {
   orgRange: () => {
     const f = $('#og-from').value, t = $('#og-to').value;
@@ -473,7 +486,7 @@ const C = {
   pickTime: (d, el) => { if (validTime(el.value)) ui.pick.time = el.value; },
   sort: (d, el) => { ui.sort = el.value; $('#bookGrid').innerHTML = bookGrid(); },
   edCat: (d, el) => { readEditor(); const old = ui.draft; if (Object.values(CATS).some(c => c.emoji === old.emoji)) old.emoji = CATS[el.value].emoji; render(); },
-  itemCheck: async (d, el) => { const i = getList(ui.listId).items.find(x => x.id === d.id); i.checked = el.checked; await save(); render(); },
+  itemCheck: async (d, el) => { const i = getList(ui.listId).items.find(x => x.id === d.id); i.checked = el.checked; if (i.checked) i.at = Date.now(); await save(); render(); },
   nlRange: () => {
     readNl();
     const f = $('#nl-from').value, t = $('#nl-to').value;
@@ -490,6 +503,8 @@ const C = {
   },
   cookGot: (d, el) => { ui.cook.got[d.k] = el.checked; el.closest('li').classList.toggle('chk', el.checked); },
 };
+
+Object.assign(A, XA); Object.assign(C, XC);
 
 /* ───────── eventos ───────── */
 let suppressClick = false;
@@ -555,7 +570,7 @@ document.addEventListener('submit', async e => {
   const name = $('#ni-name').value.trim();
   if (!name) return $('#ni-name').focus();
   const a = $('#ni-aisle').value;
-  getList(ui.listId).items.push({ id: uid(), name, qty: num($('#ni-qty').value, 0), unit: $('#ni-unit').value.trim(), aisle: a === 'auto' ? aisleOf(name) : a, checked: false, src: 'manual', pkey: '', edited: false, recipes: [] });
+  getList(ui.listId).items.push(withPrice({ id: uid(), name, qty: num($('#ni-qty').value, 0), unit: $('#ni-unit').value.trim(), aisle: a === 'auto' ? aisleOf(name) : a, checked: false, src: 'manual', pkey: '', edited: false, recipes: [] }));
   await save(); render(); $('#ni-name').focus();
   toast(`${name}: añadido`);
 });
@@ -610,7 +625,7 @@ document.addEventListener('pointerup', async () => {
   if (s.kind === 'item' && s.dx > 90) {
     suppressClick = true; setTimeout(() => { suppressClick = false; }, 60);
     const i = getList(ui.listId)?.items.find(x => x.id === s.el.dataset.swipe);
-    if (i) { i.checked = !i.checked; await save(); render(); toast(i.checked ? `${i.name}: en el carrito` : `${i.name}: pendiente`); }
+    if (i) { i.checked = !i.checked; if (i.checked) i.at = Date.now(); await save(); render(); toast(i.checked ? `${i.name}: en el carrito` : `${i.name}: pendiente`); }
   } else if (s.kind === 'step' && Math.abs(s.dx) > 70) {
     if (s.dx < 0) A.cookNext(); else A.cookPrev();
   }
@@ -677,6 +692,8 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   S = normalizeState(raw);
   if (!raw) { addSamples(); await save(); }
   render();
+  if (!raw && needsOnboarding()) onboard(); else if (raw) markOnboarded();
+  setInterval(() => Reminders.tick(), 30000); Reminders.tick(); Reminders.sync();
   tick();
   setInterval(tick, 250);
   Cloud.init().catch(() => {});
