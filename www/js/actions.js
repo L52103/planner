@@ -701,7 +701,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   if (seeded) await save();
   render();
   if (!raw && needsOnboarding()) onboard(); else if (raw) markOnboarded();
-  if (seeded && raw) toast(`${seeded} recetas nuevas en tu recetario`);
+  if (seeded && raw) toast(seeded === 1 ? '1 receta nueva en tu recetario' : `${seeded} recetas nuevas en tu recetario`);
   setInterval(() => Reminders.tick(), 30000); Reminders.tick(); Reminders.sync();
   tick();
   setInterval(tick, 250);
