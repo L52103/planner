@@ -12,6 +12,28 @@ const peopleCount = () => Math.max(1, Math.round(num(profile().servings, 1)) || 
 let afterT;
 function afterSave() { clearTimeout(afterT); afterT = setTimeout(() => { Reminders.sync(); Shared.schedule(); }, 800); }
 
+/* ═════════ Recetario base (data/recetas-base.json) ═════════
+   Se añade una sola vez por dispositivo. Ids fijos derivados del nombre: si dos dispositivos lo cargan,
+   la sincronización los reconoce como la misma receta y no se duplican. Se saltan los nombres que ya existen. */
+const BASE_KEY = 'planner.base', BASE_VERSION = 1;
+const baseId = name => 'base-' + fold(name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+async function seedBase() {
+  if (num(lsGet(BASE_KEY, 0), 0) >= BASE_VERSION) return 0;
+  let data;
+  try { const res = await fetch('data/recetas-base.json', { cache: 'no-cache' }); if (!res.ok) return 0; data = await res.json(); } catch { return 0; }
+  const have = new Set(S.recipes.map(r => fold(r.name))), ids = new Set(S.recipes.map(r => r.id));
+  let n = 0;
+  for (const raw of data.recipes || []) {
+    let r; try { r = cleanRecipe(raw); } catch { continue; }
+    const id = baseId(r.name);
+    if (have.has(fold(r.name)) || ids.has(id)) continue;
+    S.recipes.push({ ...r, id, fav: false, createdAt: Date.now() });
+    have.add(fold(r.name)); n++;
+  }
+  lsSet(BASE_KEY, BASE_VERSION);
+  return n;
+}
+
 /* ═════════ Indicador de sincronización (barra superior) ═════════ */
 const syncState = () => !Cloud.available() ? 'off' : Cloud.user ? (Cloud.status === 'idle' ? 'ok' : Cloud.status) : 'off';
 const syncLabel = () => Cloud.user ? Cloud.statusText().replace(/\.$/, '') : 'Nube sin conectar: los datos solo están aquí. Toca para conectar';

@@ -697,8 +697,11 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   const raw = await Store.load();
   S = normalizeState(raw);
   if (!raw) { addSamples(); await save(); }
+  const seeded = await seedBase();
+  if (seeded) await save();
   render();
   if (!raw && needsOnboarding()) onboard(); else if (raw) markOnboarded();
+  if (seeded && raw) toast(`${seeded} recetas nuevas en tu recetario`);
   setInterval(() => Reminders.tick(), 30000); Reminders.tick(); Reminders.sync();
   tick();
   setInterval(tick, 250);
